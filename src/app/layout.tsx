@@ -26,6 +26,14 @@ export default function RootLayout({
     <html lang="en" className={inter.variable}>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+        {/* OpenGraph & Twitter Meta Tags */}
+        <meta property="og:title" content="Monad Counter" />
+        <meta property="og:description" content="On-chain counter mini-app for Monad and Farcaster." />
+        <meta property="og:image" content="https://monad-counter.vercel.app/images/feed.png" />
+        <meta property="og:url" content="https://monad-counter.vercel.app/" />
+        <meta name="twitter:card" content="summary_large_image" />
+        {/* Farcaster Mini App Embed Meta */}
+        <meta name="fc:frame" content='{"version":"1","imageUrl":"https://monad-counter.vercel.app/images/feed.png","button":{"title":"Launch Counter","action":{"type":"launch_frame","name":"Monad Counter","url":"https://monad-counter.vercel.app","splashImageUrl":"https://monad-counter.vercel.app/images/splash.png","splashBackgroundColor":"#181028"}}}' />
       </head>
       <body>
         <Providers>

@@ -261,6 +261,7 @@ function WarpcastCounter() {
         },
       });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess, txError]);
   
   // Show error if exists

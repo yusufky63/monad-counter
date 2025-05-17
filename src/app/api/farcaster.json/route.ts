@@ -16,16 +16,16 @@ export async function GET() {
       version: "1",
       name: "Monad Counter",
       description: "On-chain counter mini-app for Monad and Farcaster.",
-      iconUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
+      iconUrl: "https://monad-counter.vercel.app/images/icon.png",
       homeUrl: appUrl,
-      imageUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
+      imageUrl: "https://monad-counter.vercel.app/images/feed.png",
       screenshotUrls: [
-        "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png"
+        "https://monad-counter.vercel.app/images/feed.png"
       ],
       tags: ["monad", "counter", "blockchain", "web3", "on-chain"],
       primaryCategory: "utility",
       buttonTitle: "Launch Counter",
-      splashImageUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
+      splashImageUrl: "https://monad-counter.vercel.app/images/splash.png",
       splashBackgroundColor: "#181028"
     }
   };
