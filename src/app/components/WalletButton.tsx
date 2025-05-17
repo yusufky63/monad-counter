@@ -8,34 +8,195 @@ import { useSwitchChain } from "wagmi";
 
 export default function WalletButton() {
   const { isConnected, address } = useAccount();
-  const { connect, connectors } = useConnect();
+  const { connect, connectors, status: connectStatus, error: connectError } = useConnect();
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const [copied, setCopied] = React.useState(false);
+  const [isConnecting, setIsConnecting] = React.useState(false);
   
-  // Import context but suppress unused variable warnings
+  // Import context for Farcaster functionality - not directly used but kept for future
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { isEthProviderAvailable, isSDKLoaded } = useMiniAppContext();
+  const { isEthProviderAvailable, isSDKLoaded, actions } = useMiniAppContext();
 
-  function isInMiniApp() {
+  // Determine if we're in Warpcast environment
+  function isInWarpcast() {
     return typeof window !== 'undefined' && window.parent !== window;
   }
+
+  // Log connector information to debug connection issues
+  React.useEffect(() => {
+    console.log("Available connectors:", connectors.map(c => ({
+      id: c.id,
+      name: c.name,
+      ready: c.ready,
+    })));
+  }, [connectors]);
+
+  // Log connection status to help debug
+  React.useEffect(() => {
+    console.log("Connection state:", {
+      isConnected,
+      connectStatus,
+      isConnecting,
+      hasError: !!connectError
+    });
+    
+    if (connectError) {
+      console.error("Connection error:", connectError);
+    }
+  }, [isConnected, connectStatus, isConnecting, connectError]);
+
+  // Auto-connect only once on mount
+  React.useEffect(() => {
+    const autoConnect = async () => {
+      try {
+        if (isInWarpcast()) {
+          // In Warpcast, use farcaster connector (id is 'farcaster', not 'farcasterFrame')
+          const farcasterConnector = connectors.find(c => c.id === 'farcaster');
+          if (farcasterConnector) {
+            setIsConnecting(true);
+            await connect({ connector: farcasterConnector });
+          } else {
+            console.error("Farcaster connector not found");
+          }
+        } else {
+          // In browser, try to auto-connect with any available wallet
+          // Don't depend on the 'ready' status, just try to connect
+          if (connectors.length > 0) {
+            // Try with different connectors without checking ready status
+            const priorityConnectors = [
+              connectors.find(c => c.id === 'injected'),
+              connectors.find(c => c.id === 'metaMaskSDK'),
+              ...connectors.filter(c => c.id !== 'farcaster') // Try all non-farcaster connectors
+            ].filter(Boolean); // Remove undefined values
+            
+            for (const connector of priorityConnectors) {
+              try {
+                if (connector) {
+                  setIsConnecting(true);
+                  console.log(`Trying to connect with ${connector.id}`);
+                  await connect({ connector });
+                  break; // Exit loop if successful
+                }
+              } catch (err) {
+                console.log(`Failed to connect with ${connector?.id}:`, err);
+                // Continue to next connector
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Auto-connect failed:", error);
+      } finally {
+        setIsConnecting(false);
+      }
+    };
+
+    if (!isConnected && !isConnecting) {
+      autoConnect();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Check if we're on the right chain when wallet is connected
   React.useEffect(() => {
     if (isConnected && chainId !== monadTestnet.id) {
-      // Try to switch chain, ignore any errors
       try {
         switchChain({ chainId: monadTestnet.id });
       } catch (error: unknown) {
-        // Silent error handling - don't show errors to user
         console.log("Chain switch failed:", error);
       }
     }
   }, [isConnected, chainId, switchChain]);
 
-  // Connected state - show same UI in all environments
+  // Handle manual connection
+  const handleConnect = async () => {
+    setIsConnecting(true);
+    
+    try {
+      if (isInWarpcast()) {
+        // Find Farcaster connector using correct ID
+        const farcasterConnector = connectors.find(c => c.id === 'farcaster');
+        if (farcasterConnector) {
+          console.log("Connecting with Farcaster");
+          await connect({ connector: farcasterConnector });
+        } else {
+          console.error("Farcaster connector not found");
+        }
+      } else {
+        // In browser, try all connectors in sequence
+        // Don't rely on 'ready' status - just try connecting
+        if (connectors.length > 0) {
+          let success = false;
+          
+          // First try injected
+          const injectedConnector = connectors.find(c => c.id === 'injected');
+          if (injectedConnector) {
+            try {
+              console.log("Trying injected connector");
+              await connect({ connector: injectedConnector });
+              success = true;
+            } catch (err) {
+              console.log("Injected connector failed:", err);
+            }
+          }
+          
+          // Then try MetaMask
+          if (!success) {
+            const metaMaskConnector = connectors.find(c => c.id === 'metaMaskSDK');
+            if (metaMaskConnector) {
+              try {
+                console.log("Trying MetaMask connector");
+                await connect({ connector: metaMaskConnector });
+                success = true;
+              } catch (err) {
+                console.log("MetaMask connector failed:", err);
+              }
+            }
+          }
+          
+          // Finally try any other browser connectors
+          if (!success) {
+            const browserConnectors = connectors.filter(c => 
+              c.id !== 'farcaster' && c.id !== 'injected' && c.id !== 'metaMaskSDK'
+            );
+            
+            for (const connector of browserConnectors) {
+              try {
+                console.log(`Trying ${connector.name} connector`);
+                await connect({ connector });
+                success = true;
+                break;
+              } catch (err) {
+                console.log(`${connector.name} connector failed:`, err);
+              }
+            }
+          }
+          
+          if (!success) {
+            console.error("All connection attempts failed");
+            alert("Could not connect to any wallet. Please make sure you have a wallet extension installed and try again.");
+          }
+        } else {
+          console.error("No connectors available");
+          alert("No wallet connectors found. Please install MetaMask or another wallet extension.");
+        }
+      }
+    } catch (error) {
+      console.error("Connection failed:", error);
+      alert("Connection failed. Please make sure you have a wallet extension installed.");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Handle disconnection
+  const handleDisconnect = () => {
+    disconnect();
+  };
+
+  // Connected state - show address and disconnect button
   if (isConnected) {
     const shortAddress = address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "";
     return (
@@ -54,7 +215,7 @@ export default function WalletButton() {
           {shortAddress}
         </span>
         <button
-          onClick={() => disconnect()}
+          onClick={handleDisconnect}
           className="ml-2 p-1 rounded hover:bg-gray-800 transition-colors"
           title="Disconnect"
         >
@@ -65,26 +226,26 @@ export default function WalletButton() {
     );
   }
 
-  // Not connected - use the appropriate connector based on environment
-  const handleConnectWallet = () => {
-    if (isInMiniApp()) {
-      // In Warpcast - use Frame connector
-      const frameConnector = connectors.find(c => c.id === 'farcasterFrame');
-      if (frameConnector) {
-        connect({ connector: frameConnector });
-      }
-    } else {
-      // In browser - use injected connector (MetaMask, etc.)
-      const injectedConnector = connectors.find(c => c.id === 'injected');
-      if (injectedConnector) {
-        connect({ connector: injectedConnector });
-      }
-    }
-  };
+  // Connection in progress state
+  if (isConnecting || connectStatus === 'pending') {
+    return (
+      <button 
+        disabled
+        className="flex items-center gap-2 px-4 py-3 rounded-lg text-base font-medium bg-purple-700/70 text-white justify-center w-full cursor-wait"
+      >
+        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Connecting...
+      </button>
+    );
+  }
 
+  // Not connected state - show connect button
   return (
     <button
-      onClick={handleConnectWallet}
+      onClick={handleConnect}
       className="flex items-center gap-2 px-4 py-3 rounded-lg text-base font-medium bg-purple-700 text-white hover:bg-purple-800 justify-center w-full"
     >
       Connect Wallet

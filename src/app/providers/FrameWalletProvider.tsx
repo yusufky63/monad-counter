@@ -4,18 +4,29 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { monadTestnet } from "wagmi/chains";
-import { injected } from "wagmi/connectors";
+import { injected, metaMask } from "wagmi/connectors";
 
-// Create configuration with both Farcaster Frame connector for warpcast
-// and injected connector for browser wallets like MetaMask
+// Create configuration with both Farcaster connector for warpcast
+// and multiple browser wallet connectors for better compatibility
 export const config = createConfig({
   chains: [monadTestnet],
   transports: {
-    [monadTestnet.id]: http(),
+    [monadTestnet.id]: http("https://testnet-rpc.monad.xyz", {
+      batch: {
+        batchSize: 1, // Reduce batch size to avoid rate limiting
+        wait: 10,     // Add delay between requests
+      },
+      timeout: 15000, // Increase timeout
+      retryCount: 3,  // Add retries
+    }),
   },
   connectors: [
+    // The ID for this connector will be 'farcaster' in the client
     farcasterFrame(),
-    injected() // Add injected connector for browser wallets
+    
+    // Browser wallet connectors
+    injected(),
+    metaMask(),
   ],
 });
 
