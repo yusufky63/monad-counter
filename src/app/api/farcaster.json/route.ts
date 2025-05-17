@@ -15,7 +15,7 @@ export async function GET() {
     frame: {
       version: "1",
       name: "Monad Counter",
-      description: "On-chain counter mini-app for Monad & Farcaster.",
+      description: "On-chain counter mini-app for Monad and Farcaster.",
       iconUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
       homeUrl: appUrl,
       imageUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
