@@ -11,22 +11,22 @@ const LeaderboardModal = ({
 }) => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="fixed inset-0 flex items-start md:items-center justify-center p-2 md:p-3">
+      <div className="fixed inset-0 flex items-center justify-center p-2 md:p-4">
         {/* Backdrop */}
         <div className={`absolute inset-0 ${theme === "dark" ? "bg-black/50" : "bg-black/20"} backdrop-blur-sm`} onClick={onClose} />
 
         {/* Modal */}
         <div
-          className={`relative w-full max-w-md max-h-[95vh] overflow-hidden flex flex-col ${
+          className={`relative w-full max-w-md h-auto max-h-[80vh] flex flex-col ${
             theme === "dark"
               ? "bg-black/90 border-white/10"
               : "bg-white border-gray-200"
-          } rounded-2xl border mt-4 md:mt-0 shadow-xl`}
+          } rounded-2xl border shadow-xl`}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div
-            className={`p-2 border-b ${
+            className={`p-3 border-b ${
               theme === "dark" ? "border-white/10" : "border-gray-200"
             }`}
           >
@@ -49,11 +49,11 @@ const LeaderboardModal = ({
             </div>
           </div>
 
-          {/* Content - Pass hideTitle prop to Leaderboard */}
-          <div className="flex-1 overflow-y-auto p-2">
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-3">
             <Leaderboard
               theme={theme}
-              isLoading={loading}
+              loading={loading}
               leaderboard={leaderboard}
               userAddress={address}
               hideTitle={true}

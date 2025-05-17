@@ -120,10 +120,7 @@ const HowItWorksModal = ({ theme, onClose, fee }) => {
                     <span className="mt-0.5">•</span>
                     <span>Compete with other Farcaster users for the top position</span>
                   </li>
-                  <li className="flex items-start gap-1">
-                    <span className="mt-0.5">•</span>
-                    <span>Make at least 1 contribution to appear on the leaderboard</span>
-                  </li>
+                 
                 </ul>
               </div>
 

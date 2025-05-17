@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { ThemeContext } from "./context/ThemeContext";
 import { toast } from "react-hot-toast";
 import { BigNumber } from "ethers";
+import { ethers } from "ethers";
 
 // Components
 import LeaderboardModal from "./components/LeaderboardModal";
@@ -19,7 +20,6 @@ import { getContractAddress } from "./utils/ContractAddresses";
 import sdk from './services/farcaster';
 
 // Import custom hooks
-import useCounter from "./hooks/useCounter";
 
 // Monad Testnet Chain ID
 const MONAD_CHAIN_ID = 10143;
@@ -40,7 +40,6 @@ export default function OnChainCounter() {
       try {
         // Tell Farcaster that app is ready to be displayed (hide splash screen)
         await sdk.actions.ready();
-        console.log("Farcaster app is ready");
       } catch (error) {
         console.error("Failed to initialize Farcaster SDK:", error);
       } finally {
@@ -55,10 +54,16 @@ export default function OnChainCounter() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-900">
         <div className="w-full max-w-md p-6 animate-pulse">
+          {/* Header skeleton */}
           <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded mb-8"></div>
-          <div className="h-48 bg-gray-300 dark:bg-gray-700 rounded-lg mb-8"></div>
-          <div className="h-12 bg-gray-300 dark:bg-gray-700 rounded-full mb-6"></div>
-          <div className="h-6 bg-gray-300 dark:bg-gray-700 rounded mb-4 w-3/4 mx-auto"></div>
+          
+          {/* Counter display skeleton */}
+          <div className="relative py-8 px-4 rounded-2xl">
+            <div className="h-48 bg-gray-300 dark:bg-gray-700 rounded-xl"></div>
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-600/10 blur-xl"></div>
+          </div>
+
+          {/* Action buttons skeleton */}
           <div className="flex justify-center space-x-4 mt-8">
             <div className="h-10 w-10 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
             <div className="h-10 w-10 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
@@ -109,12 +114,79 @@ function WarpcastCounter() {
   const chainId = useChainId();
   const { data: walletClient } = useWalletClient();
   
-  // Custom hook for counter data
-  const { leaderboard, loading, error } = useCounter({
-    chainId: MONAD_CHAIN_ID,
-    address: "0x0000000000000000000000000000000000000000",
-    isConnected: false,
-  });
+
+
+  // Direct leaderboard fetch with proper error handling
+  const [directLeaderboard, setDirectLeaderboard] = useState([]);
+  const [directLeaderboardLoading, setDirectLeaderboardLoading] = useState(true);
+
+  // Fetch leaderboard directly
+  const fetchLeaderboardDirect = useCallback(async () => {
+    if (!contractAddress) return;
+    setDirectLeaderboardLoading(true);
+    
+    try {
+      // Create a minimal ethers provider
+      const provider = new ethers.providers.JsonRpcProvider("https://testnet-rpc.monad.xyz");
+      const contract = new ethers.Contract(contractAddress, counterABI, provider);
+      
+      // Get leaderboard size
+      const leaderboardSize = await contract.leaderboardSize();
+      
+      // If size is 0, return empty array
+      if (leaderboardSize.eq(0)) {
+        setDirectLeaderboard([]);
+        setDirectLeaderboardLoading(false);
+        return;
+      }
+      
+      // Get all users
+      try {
+        // Note: using toString() to handle BigNumber conversion
+        const sizeNumber = parseInt(leaderboardSize.toString());
+        
+        const users = await contract.getTopUsers(sizeNumber);
+        
+        // Format for component
+        const formatted = users.map((entry: { user: string; score: { toString(): string }; lastUpdate: { toString(): string } }) => ({
+          userAddress: entry.user,
+          contributions: parseInt(entry.score.toString()),
+          lastUpdate: parseInt(entry.lastUpdate.toString())
+        }));
+        
+        setDirectLeaderboard(formatted);
+      } catch (err) {
+        console.error("Error getting top users:", err);
+        // Try with known valid value if size error
+        try {
+          const users = await contract.getTopUsers(1);
+          const formatted = users.map((entry: { user: string; score: { toString(): string }; lastUpdate: { toString(): string } }) => ({
+            userAddress: entry.user,
+            contributions: parseInt(entry.score.toString()),
+            lastUpdate: parseInt(entry.lastUpdate.toString())
+          }));
+          setDirectLeaderboard(formatted);
+        } catch (finalErr) {
+          console.error("Final error getting users:", finalErr);
+          setDirectLeaderboard([]);
+        }
+      }
+    } catch (err) {
+      console.error("Direct leaderboard fetch error:", err);
+      setDirectLeaderboard([]);
+    } finally {
+      setDirectLeaderboardLoading(false);
+    }
+  }, [contractAddress]);
+  
+  // Fetch direct leaderboard on load
+  useEffect(() => {
+    fetchLeaderboardDirect();
+    
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchLeaderboardDirect, 30000);
+    return () => clearInterval(interval);
+  }, [fetchLeaderboardDirect]);
   
   // Read contract data
   const fetchContractData = async () => {
@@ -179,59 +251,130 @@ function WarpcastCounter() {
   useEffect(() => {
     fetchContractData();
     
-    const interval = setInterval(fetchContractData, 5000);
+    const interval = setInterval(fetchContractData, 15000);
     return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contractAddress]);
   
-  // Handle increment transaction in Warpcast
-  const handleIncrement = async () => {
-    if (!contractAddress) return;
+  // Separate function to check transaction status without blocking UI
+  const checkTransactionStatus = async (txHash, walletClient) => {
     try {
-      if (chainId !== MONAD_CHAIN_ID) {
-        if (!walletClient) return;
-        await switchChain(walletClient, { id: MONAD_CHAIN_ID });
-      }
-      // Sabit fee kullan
-      const feeValue = parseEther('0.005'); // 0.005 MON
-      toast.loading("Sending transaction...", { id: "increment-transaction" });
-      const txHash = await mutation.writeContractAsync({
-        address: contractAddress,
-        abi: counterABI,
-        functionName: "incrementCounter",
-        chainId: MONAD_CHAIN_ID,
-        value: feeValue,
-      });
-      console.log("Transaction hash (user confirmed):", txHash);
-      toast.loading("Waiting for on-chain confirmation...", { id: "increment-transaction" });
       const { waitForTransactionReceipt } = await import('viem/actions');
-      if (!walletClient) {
-        console.log("walletClient is missing, cannot wait for receipt");
-        return;
-      }
-      const receipt = await waitForTransactionReceipt(walletClient, { hash: txHash });
-      console.log("Transaction receipt:", receipt);
+      
+      // Set a reasonable timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Transaction confirmation timeout")), 25000)
+      );
+      
+      // Race between transaction receipt and timeout
+      const receipt = await Promise.race([
+        waitForTransactionReceipt(walletClient, { hash: txHash }),
+        timeoutPromise
+      ]);
+      
       toast.dismiss("increment-transaction");
+      
       if (receipt.status === "success") {
-        console.log("Transaction confirmed! Updating counter.");
-        toast.success("Transaction successfully confirmed!", { id: "increment-success" });
-        fetchContractData();
+        toast.success("Transaction confirmed!", { id: "increment-success", duration: 3000 });
+        fetchContractData(); // Update counter data
       } else {
-        console.log("Transaction failed!", receipt);
-        toast.error("Transaction failed on-chain!", { id: "increment-error" });
+        toast.error("Transaction failed!", { id: "increment-error", duration: 3000 });
       }
     } catch (error) {
       toast.dismiss("increment-transaction");
-      if (!(error instanceof Error && error.message?.includes('eth_getTransactionReceipt'))) {
-        if (error instanceof Error && error.message?.includes('User rejected the request')) {
-          toast.error('Transaction cancelled by user.', { id: 'increment-error' });
-        } else if (error instanceof Error && error.message?.includes('The Provider does not support the requested method')) {
-          // Do not show any toast for this error
-        } else {
-          toast.error("Transaction error: " + (error instanceof Error ? error.message : ""), {
-            id: "increment-error",
+      // If it's a timeout, show a different message
+      if (error.message === "Transaction confirmation timeout") {
+        toast.success("Transaction submitted! It may take a while to confirm.", {
+          id: "increment-status", 
+          duration: 4000
+        });
+        // Still try to refresh data after a delay
+        setTimeout(fetchContractData, 5000);
+      } else {
+        toast.error("Error checking transaction", { id: "increment-error", duration: 3000 });
+      }
+    }
+  };
+
+  // Modify the transaction submission part in handleIncrement
+  const handleIncrement = async () => {
+    if (!contractAddress) return;
+    try {
+      // Ensure we're on the right chain - silently try to switch first
+      if (chainId !== MONAD_CHAIN_ID && walletClient) {
+        try {
+          // Sessizce ağ değiştirmeyi dene
+          await switchChain(walletClient, { id: MONAD_CHAIN_ID });
+          // Başarılıysa, toast gösterme - sessizce devam et
+        } catch {
+          // Switch başarısız olursa kullanıcıya bildir
+          toast.error("Please switch to Monad network in your wallet", { 
+            id: "network-switch",
+            duration: 3000
           });
+          return;
         }
       }
+      
+      // Sabit fee kullan
+      const feeValue = parseEther('0.005'); // 0.005 MON
+      toast.loading("Sending transaction...", { id: "increment-transaction", duration: 3000 });
+      
+      try {
+        const txHash = await mutation.writeContractAsync({
+          address: contractAddress,
+          abi: counterABI,
+          functionName: "incrementCounter",
+          chainId: MONAD_CHAIN_ID,
+          value: feeValue,
+        });
+        
+        // Immediately show success message for submitting the transaction
+        toast.loading("Transaction submitted, waiting for confirmation...", { 
+          id: "increment-transaction", 
+          duration: 5000 
+        });
+        
+        // If we have a wallet client, start background monitoring
+        if (walletClient) {
+          // Don't await - let it run in background to not block UI
+          checkTransactionStatus(txHash, walletClient);
+        } else {
+          // If no wallet client, just show a success message
+          toast.success("Transaction submitted!", { id: "increment-success", duration: 3000 });
+        }
+        
+        // Refresh data after a short delay regardless
+        setTimeout(fetchContractData, 3000);
+      } catch (txError) {
+        toast.dismiss("increment-transaction");
+        
+        // Özel hata mesajları için kontroller
+        if (txError instanceof Error) {
+          // Chain mismatch hatasını kontrol et
+          if (txError.message.includes('chain') && txError.message.includes('does not match')) {
+            toast.error("Please switch to Monad network", {
+              id: "chain-error",
+              duration: 3000
+            });
+            return;
+          }
+          
+          // Diğer bilinen hatalar
+          if (txError.message.includes('User rejected the request')) {
+            toast.error('Transaction cancelled', { id: 'increment-error', duration: 3000 });
+          } else if (txError.message.includes('The Provider does not support the requested method')) {
+            // Do not show any toast for this error
+          } else {
+            toast.error("Transaction error", { id: "increment-error", duration: 3000 });
+          }
+        } else {
+          toast.error("Transaction failed", { id: "increment-error", duration: 3000 });
+        }
+      }
+    } catch {
+      toast.dismiss("increment-transaction");
+      toast.error("Connection error", { id: "increment-error", duration: 3000 });
     }
   };
   
@@ -239,26 +382,28 @@ function WarpcastCounter() {
   React.useEffect(() => {
     if (isSuccess) {
       toast.dismiss("increment-transaction");
-      toast.success("Transaction successfully confirmed!", {
+      toast.success("Transaction confirmed!", {
         id: "increment-success",
-          style: {
-            background: "#1e293b",
+        style: {
+          background: "#1e293b",
           color: "#22c55e",
           border: "1px solid rgba(34,197,94,0.2)",
-          },
-        });
+        },
+        duration: 3000
+      });
       // Counter'ı hemen güncelle
-          fetchContractData();
+      fetchContractData();
     }
     if (txError) {
       toast.dismiss("increment-transaction");
-      toast.error("Transaction error: " + (txError.message || "Unknown error"), {
+      toast.error("Transaction error", {
         id: "increment-error",
         style: {
           background: "#1e293b",
           color: "#ef4444",
           border: "1px solid rgba(239,68,68,0.2)",
         },
+        duration: 3000
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -266,18 +411,19 @@ function WarpcastCounter() {
   
   // Show error if exists
   React.useEffect(() => {
-    if (error) {
-      toast.error(typeof error === 'object' && error !== null && 'message' in error 
-        ? (error as Error).message 
+    if (txError) {
+      toast.error(typeof txError === 'object' && txError !== null && 'message' in txError 
+        ? (txError as Error).message 
         : "An error occurred", {
           style: {
             background: "#1e293b",
             color: "#ef4444",
             border: "1px solid rgba(239,68,68,0.2)",
           },
+          duration: 3000
       });
     }
-  }, [error]);
+  }, [txError]);
   
   return (
     <FarcasterWrapper>
@@ -330,8 +476,8 @@ function WarpcastCounter() {
 
               try {
                 await handleIncrement();
-              } catch (err) {
-                console.error("Click handler error:", err);
+              } catch {
+                // Toast already handled in handleIncrement
               }
             }}
           >
@@ -356,17 +502,7 @@ function WarpcastCounter() {
                   </span>
                 </div>
                 <div className="text-center text-xs text-gray-400 mt-2 select-none">Tap to increase</div>
-                {isPending && (
-                  <div
-                    className={`text-sm ${
-                      theme === "dark" ? "text-gray-400" : "text-gray-600"
-                    }`}
-                  >
-                        <p className="text-xs mt-1 opacity-60">
-                          {fee ? `Fee: ${fee.toString()}` : "Loading fee..."}
-                        </p>
-                  </div>
-                )}
+               
               </div>
             </div>
           </div>
@@ -397,8 +533,8 @@ function WarpcastCounter() {
         {isStatsModalOpen && (
           <LeaderboardModal 
             onClose={() => setIsStatsModalOpen(false)}
-            leaderboard={leaderboard || []}
-            loading={loading}
+            leaderboard={directLeaderboard}
+            loading={directLeaderboardLoading}
             theme={theme}
             address={address}
           />

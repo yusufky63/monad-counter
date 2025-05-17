@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useContext } from "react";
 import { ThemeContext } from "../context/ThemeContext";
 
-const MIN_CONTRIBUTIONS_FOR_LEADERBOARD = 1; // Minimum number of contributions
+const MIN_CONTRIBUTIONS_FOR_LEADERBOARD = 0; // Minimum number of contributions
 
 const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false }) => {
+  console.log(leaderboard);
   const { theme } = useContext(ThemeContext);
   const [page, setPage] = useState(0);
   const itemsPerPage = 5;
@@ -11,13 +12,13 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
   // Process and memoize leaderboard data
   const processedLeaderboard = useMemo(() => {
     if (!Array.isArray(leaderboard)) return [];
+    console.log('[Leaderboard.js] Incoming data:', leaderboard);
     return leaderboard
-      .filter(
-        (user) =>
-          user &&
-          user.userAddress &&
-          user.userAddress !== "0x0000000000000000000000000000000000000000" &&
-          Number(user.contributions) >= MIN_CONTRIBUTIONS_FOR_LEADERBOARD
+      .filter(user => 
+        user && 
+        user.userAddress && 
+        user.userAddress !== '0x0000000000000000000000000000000000000000' &&
+        Number(user.contributions) >= MIN_CONTRIBUTIONS_FOR_LEADERBOARD
       )
       .sort((a, b) => Number(b.contributions) - Number(a.contributions));
   }, [leaderboard]);
@@ -92,17 +93,6 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return "Unknown";
-    return new Date(Number(timestamp) * 1000).toLocaleString("en-US", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
   const getPositionEmoji = (position) => {
     if (position === 1) return "👑";
     if (position === 2) return "🥈";
@@ -136,7 +126,7 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
       </div>
       )}
 
-      <div className="max-h-[50vh] overflow-y-auto space-y-3 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent pr-1">
+      <div className="space-y-3 pr-1">
         {currentPageData.map((user, index) => {
           const position = page * itemsPerPage + index + 1;
           const isCurrentUser = user.userAddress === userAddress;
@@ -155,7 +145,7 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
               }`}
             >
               <div
-                className={`flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-xl ${
+                className={`flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 rounded-xl ${
                   position <= 3
                     ? theme === "dark"
                       ? "bg-yellow-500/20 text-yellow-400"
@@ -163,7 +153,7 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
                     : theme === "dark"
                     ? "bg-gray-800/50 text-gray-400"
                     : "bg-gray-100 text-gray-600"
-                } font-bold text-lg`}
+                } font-bold text-base sm:text-lg`}
               >
                 {getPositionEmoji(position)}
               </div>
@@ -172,7 +162,7 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
                 <div
                   className={`font-medium truncate ${
                     isCurrentUser
-                      ? "bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent"
+                      ? "bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent text-xs "
                       : theme === "dark"
                       ? "text-white"
                       : "text-gray-900"
@@ -182,20 +172,12 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
                 </div>
                 <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2">
                   <span
-                    className={`text-sm ${
+                    className={`text-xs sm:text-sm ${
                       theme === "dark" ? "text-gray-400" : "text-gray-500"
                     }`}
                   >
                     {Number(user.contributions).toLocaleString()} contribution
                     {Number(user.contributions) !== 1 ? "s" : ""}
-                  </span>
-                  <span className="text-xs opacity-50 hidden sm:inline">•</span>
-                  <span
-                    className={`text-xs ${
-                      theme === "dark" ? "text-gray-500" : "text-gray-400"
-                    }`}
-                  >
-                    {formatDate(user.lastUpdate)}
                   </span>
                 </div>
               </div>
@@ -211,36 +193,36 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
       </div>
 
       {totalPages > 1 && (
-        <div className="mt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center">
+        <div className="mt-4 flex flex-row justify-between items-center">
           <div
-            className={`text-sm mb-2 sm:mb-0 ${
+            className={`text-xs sm:text-sm ${
               theme === "dark" ? "text-gray-400" : "text-gray-600"
             }`}
           >
-            Page {page + 1} / {totalPages}
+            {page + 1} / {totalPages}
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex space-x-2">
             <button
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className={`px-4 py-2 rounded-xl border transition-all ${
+              className={`px-3 py-1 rounded-lg border transition-all ${
                 theme === "dark"
                   ? "bg-black/20 border-white/10 hover:bg-black/30 disabled:bg-black/10 disabled:border-white/5"
                   : "bg-white/60 border-black/5 hover:bg-white/80 disabled:bg-white/40 disabled:border-black/5"
-              } disabled:cursor-not-allowed text-sm`}
+              } disabled:cursor-not-allowed text-xs sm:text-sm`}
             >
-              Previous
+              ← Prev
             </button>
             <button
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page === totalPages - 1}
-              className={`px-4 py-2 rounded-xl border transition-all ${
+              className={`px-3 py-1 rounded-lg border transition-all ${
                 theme === "dark"
                   ? "bg-black/20 border-white/10 hover:bg-black/30 disabled:bg-black/10 disabled:border-white/5"
                   : "bg-white/60 border-black/5 hover:bg-white/80 disabled:bg-white/40 disabled:border-black/5"
-              } disabled:cursor-not-allowed text-sm`}
+              } disabled:cursor-not-allowed text-xs sm:text-sm`}
             >
-              Next
+              Next →
             </button>
           </div>
         </div>

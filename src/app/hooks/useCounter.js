@@ -113,23 +113,39 @@ export const useCounter = ({ chainId, address, isConnected }) => {
   const fetchLeaderboard = useCallback(async () => {
     try {
       if (!ethersContract) return [];
+      
       // Get leaderboard size
       const leaderboardSize = await ethersContract.leaderboardSize();
+      console.log('[LEADERBOARD] leaderboardSize:', leaderboardSize.toString());
+      
+      // If leaderboardSize is zero, return empty array
       if (leaderboardSize.eq(0)) return [];
-      // Fetch top users
+      
+      // Use the FULL leaderboardSize value for getTopUsers
       const leaderboardData = await ethersContract.getTopUsers(leaderboardSize);
-      // Format the data
-      const formatted = leaderboardData.map((entry, index) => ({
-        address: entry.user,
-        contribution: entry.score.toNumber(),
-        rank: index + 1,
-        lastUpdate: entry.lastUpdate?.toNumber?.() ?? 0,
-      }));
-      // Sort by contribution (highest first)
-      return formatted.sort((a, b) => b.contribution - a.contribution);
+      console.log('[LEADERBOARD] getTopUsers raw:', leaderboardData);
+      
+      // Format the data to match Leaderboard.js expectations
+      const formatted = leaderboardData.map((entry) => {
+        // Map contract fields to component expected fields
+        return {
+          userAddress: entry.user,
+          contributions: entry.score.toNumber(),
+          lastUpdate: entry.lastUpdate?.toNumber?.() ?? 0,
+        };
+      });
+      
+      console.log('[LEADERBOARD] formatted:', formatted);
+      
+      // Sort by contributions (highest first)
+      const sorted = formatted.sort((a, b) => b.contributions - a.contributions);
+      console.log('[LEADERBOARD] sorted:', sorted);
+      
+      return sorted;
     } catch (error) {
-      console.error("Error fetching leaderboard:", error);
-      throw error;
+      console.error('[LEADERBOARD] Error fetching leaderboard:', error);
+      // Return empty array on error instead of throwing
+      return [];
     }
   }, [ethersContract]);
 
@@ -140,7 +156,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
 
       // Find the user in the leaderboard
       const userInLeaderboard = leaderboard.find(
-        (entry) => entry.address.toLowerCase() === address.toLowerCase()
+        (entry) => entry.userAddress.toLowerCase() === address.toLowerCase()
       );
 
       // If user is in the leaderboard, use that rank
@@ -159,7 +175,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
       // Find where user would be in the leaderboard
       let virtualRank = leaderboard.length + 1;
       for (let i = 0; i < leaderboard.length; i++) {
-        if (userContribution > leaderboard[i].contribution) {
+        if (userContribution > leaderboard[i].contributions) {
           virtualRank = i + 1;
           break;
         }
@@ -187,11 +203,11 @@ export const useCounter = ({ chainId, address, isConnected }) => {
         const targetRank = userRank - 1;
         const targetPerson = leaderboard.find((e) => e.rank === targetRank);
         if (targetPerson) {
-          targetContribution = targetPerson.contribution;
+          targetContribution = targetPerson.contributions;
         }
       } else if (leaderboard.length > 0) {
         // User is outside leaderboard - target the last person
-        targetContribution = leaderboard[leaderboard.length - 1].contribution;
+        targetContribution = leaderboard[leaderboard.length - 1].contributions;
       }
 
       if (targetContribution !== null) {
@@ -260,6 +276,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
       // Refresh leaderboard if needed
       if (needsRefresh(data.lastUpdate.leaderboard, CACHE_DURATION.LEADERBOARD)) {
         const leaderboard = await fetchLeaderboard();
+        console.log('[LEADERBOARD] refreshData fetched:', leaderboard);
         updatedData.leaderboard = leaderboard;
         updates.leaderboard = now;
       }
