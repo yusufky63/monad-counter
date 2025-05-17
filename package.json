@@ -9,8 +9,10 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@farcaster/frame-core": "^0.0.40",
     "@farcaster/frame-sdk": "^0.0.44",
     "@farcaster/frame-wagmi-connector": "^0.0.33",
+    "@tanstack/react-query": "^5.76.1",
     "cloudflared": "^0.7.0",
     "ethers": "^5.8.0",
     "lucide-react": "^0.503.0",

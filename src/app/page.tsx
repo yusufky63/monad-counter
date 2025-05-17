@@ -465,7 +465,7 @@ function WarpcastCounter() {
 
         {/* Farcaster Share Footer */}
         <FarcasterShareFooter counterValue={displayedCounter} />
-
+        
         {/* Modals */}
         {isStatsModalOpen && (
           <LeaderboardModal 
