@@ -4,6 +4,7 @@ import { ThemeContext } from "./context/ThemeContext";
 import { toast } from "react-hot-toast";
 import { BigNumber } from "ethers";
 import { ethers } from "ethers";
+import { Hash, WalletClient, TransactionReceipt } from "viem";
 
 // Components
 import LeaderboardModal from "./components/LeaderboardModal";
@@ -109,13 +110,10 @@ function WarpcastCounter() {
   const mutation = useWriteContract();
   const isPending = mutation.isPending;
   const isSuccess = mutation.isSuccess;
-  const txError = mutation.error;
   
-  const chainId = useChainId();
   const { data: walletClient } = useWalletClient();
+  const chainId = useChainId();
   
-
-
   // Direct leaderboard fetch with proper error handling
   const [directLeaderboard, setDirectLeaderboard] = useState([]);
   const [directLeaderboardLoading, setDirectLeaderboardLoading] = useState(true);
@@ -257,12 +255,12 @@ function WarpcastCounter() {
   }, [contractAddress]);
   
   // Separate function to check transaction status without blocking UI
-  const checkTransactionStatus = async (txHash, walletClient) => {
+  const checkTransactionStatus = async (txHash: Hash, walletClient: WalletClient) => {
     try {
       const { waitForTransactionReceipt } = await import('viem/actions');
       
       // Set a reasonable timeout
-      const timeoutPromise = new Promise((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) => 
         setTimeout(() => reject(new Error("Transaction confirmation timeout")), 25000)
       );
       
@@ -270,20 +268,20 @@ function WarpcastCounter() {
       const receipt = await Promise.race([
         waitForTransactionReceipt(walletClient, { hash: txHash }),
         timeoutPromise
-      ]);
+      ]) as TransactionReceipt;
       
       toast.dismiss("increment-transaction");
       
-      if (receipt.status === "success") {
+      if (receipt && receipt.status === "success") {
         toast.success("Transaction confirmed!", { id: "increment-success", duration: 3000 });
         fetchContractData(); // Update counter data
       } else {
         toast.error("Transaction failed!", { id: "increment-error", duration: 3000 });
       }
-    } catch (error) {
+    } catch (err) {
       toast.dismiss("increment-transaction");
       // If it's a timeout, show a different message
-      if (error.message === "Transaction confirmation timeout") {
+      if (err instanceof Error && err.message === "Transaction confirmation timeout") {
         toast.success("Transaction submitted! It may take a while to confirm.", {
           id: "increment-status", 
           duration: 4000
@@ -296,89 +294,7 @@ function WarpcastCounter() {
     }
   };
 
-  // Modify the transaction submission part in handleIncrement
-  const handleIncrement = async () => {
-    if (!contractAddress) return;
-    try {
-      // Ensure we're on the right chain - silently try to switch first
-      if (chainId !== MONAD_CHAIN_ID && walletClient) {
-        try {
-          // Sessizce ağ değiştirmeyi dene
-          await switchChain(walletClient, { id: MONAD_CHAIN_ID });
-          // Başarılıysa, toast gösterme - sessizce devam et
-        } catch {
-          // Switch başarısız olursa kullanıcıya bildir
-          toast.error("Please switch to Monad network in your wallet", { 
-            id: "network-switch",
-            duration: 3000
-          });
-          return;
-        }
-      }
-      
-      // Sabit fee kullan
-      const feeValue = parseEther('0.005'); // 0.005 MON
-      toast.loading("Sending transaction...", { id: "increment-transaction", duration: 3000 });
-      
-      try {
-        const txHash = await mutation.writeContractAsync({
-          address: contractAddress,
-          abi: counterABI,
-          functionName: "incrementCounter",
-          chainId: MONAD_CHAIN_ID,
-          value: feeValue,
-        });
-        
-        // Immediately show success message for submitting the transaction
-        toast.loading("Transaction submitted, waiting for confirmation...", { 
-          id: "increment-transaction", 
-          duration: 5000 
-        });
-        
-        // If we have a wallet client, start background monitoring
-        if (walletClient) {
-          // Don't await - let it run in background to not block UI
-          checkTransactionStatus(txHash, walletClient);
-        } else {
-          // If no wallet client, just show a success message
-          toast.success("Transaction submitted!", { id: "increment-success", duration: 3000 });
-        }
-        
-        // Refresh data after a short delay regardless
-        setTimeout(fetchContractData, 3000);
-      } catch (txError) {
-        toast.dismiss("increment-transaction");
-        
-        // Özel hata mesajları için kontroller
-        if (txError instanceof Error) {
-          // Chain mismatch hatasını kontrol et
-          if (txError.message.includes('chain') && txError.message.includes('does not match')) {
-            toast.error("Please switch to Monad network", {
-              id: "chain-error",
-              duration: 3000
-            });
-            return;
-          }
-          
-          // Diğer bilinen hatalar
-          if (txError.message.includes('User rejected the request')) {
-            toast.error('Transaction cancelled', { id: 'increment-error', duration: 3000 });
-          } else if (txError.message.includes('The Provider does not support the requested method')) {
-            // Do not show any toast for this error
-          } else {
-            toast.error("Transaction error", { id: "increment-error", duration: 3000 });
-          }
-        } else {
-          toast.error("Transaction failed", { id: "increment-error", duration: 3000 });
-        }
-      }
-    } catch {
-      toast.dismiss("increment-transaction");
-      toast.error("Connection error", { id: "increment-error", duration: 3000 });
-    }
-  };
-  
-  // Success & error feedback
+  // Success & error feedback - SUSTUR
   React.useEffect(() => {
     if (isSuccess) {
       toast.dismiss("increment-transaction");
@@ -394,36 +310,59 @@ function WarpcastCounter() {
       // Counter'ı hemen güncelle
       fetchContractData();
     }
-    if (txError) {
-      toast.dismiss("increment-transaction");
-      toast.error("Transaction error", {
-        id: "increment-error",
-        style: {
-          background: "#1e293b",
-          color: "#ef4444",
-          border: "1px solid rgba(239,68,68,0.2)",
-        },
-        duration: 3000
-      });
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSuccess, txError]);
+  }, [isSuccess]);  // txError kaldırıldı
   
-  // Show error if exists
-  React.useEffect(() => {
-    if (txError) {
-      toast.error(typeof txError === 'object' && txError !== null && 'message' in txError 
-        ? (txError as Error).message 
-        : "An error occurred", {
-          style: {
-            background: "#1e293b",
-            color: "#ef4444",
-            border: "1px solid rgba(239,68,68,0.2)",
-          },
-          duration: 3000
-      });
+  // Modify the transaction submission part in handleIncrement
+  const handleIncrement = async () => {
+    if (!contractAddress) return;
+    
+    try {
+      // Always try to switch network silently first, without showing error
+      if (walletClient && chainId !== MONAD_CHAIN_ID) {
+        try {
+          await switchChain(walletClient, { id: MONAD_CHAIN_ID });
+          
+          // Geçiş sonrası kısa bir gecikme ekle
+          await new Promise(r => setTimeout(r, 1000));
+        } catch {
+          // Sessizce başarısız ol - kullanıcıya hatayı gösterme
+        }
+      }
+      
+      // Sabit fee kullan
+      const feeValue = parseEther('0.005'); // 0.005 MON
+      
+      try {
+        const txHash = await mutation.writeContractAsync({
+          address: contractAddress,
+          abi: counterABI,
+          functionName: "incrementCounter",
+          chainId: MONAD_CHAIN_ID,
+          value: feeValue,
+        });
+        
+        // Başarılı transaction durumu
+        toast.success("Transaction sent!", { id: "increment-success", duration: 3000 });
+        
+        // Background monitoring
+        if (walletClient) {
+          checkTransactionStatus(txHash, walletClient);
+        }
+        
+        // Veriyi yenile
+        setTimeout(fetchContractData, 3000);
+      } catch (txError) {
+        // Sadece user rejection'ı göster, başka hiçbir hata gösterme
+        if (txError instanceof Error && txError.message.includes('User rejected the request')) {
+          toast.error('Transaction cancelled', { id: 'increment-error', duration: 3000 });
+        }
+        // Diğer tüm hataları gösterme!
+      }
+    } catch {
+      // Hiçbir bağlantı hatasını gösterme
     }
-  }, [txError]);
+  };
   
   return (
     <FarcasterWrapper>
