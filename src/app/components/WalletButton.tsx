@@ -26,7 +26,7 @@ type FarcasterContext = {
 
 function isWarpcastEnv() {
   if (typeof window === 'undefined') return false;
-  return window.parent !== window || window.IS_WARPCAST_ENV;
+  return window.parent !== window || !!window.IS_WARPCAST_ENV;
 }
 
 function isInMiniApp() {
@@ -40,76 +40,82 @@ export default function WalletButton() {
   const [copied, setCopied] = React.useState(false);
   const [fcUser, setFcUser] = React.useState<FarcasterContext["user"] | null>(null);
   const [signingIn, setSigningIn] = React.useState(false);
-  const [retryCount, setRetryCount] = React.useState(0);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   // Farcaster bağlantısı ve durum yönetimi
   const getFarcasterContext = React.useCallback(async () => {
-    if (!isInMiniApp()) return;
+    if (!isInMiniApp()) return false;
     
     try {
       const ctx: FarcasterContext = await sdk.context;
-      if (ctx.user && ctx.user.fid) {
+      if (ctx && ctx.user && ctx.user.fid) {
         setFcUser(ctx.user);
         return true;
       }
+      return false;
     } catch (err) {
       console.warn("Error getting Farcaster context:", err);
+      return false;
     }
-    return false;
   }, []);
 
-  // Daha güvenilir signIn
+  // Warpcast'te sign-in sürecini başlat
   const signInWithFarcaster = React.useCallback(async () => {
     if (signingIn) return;
+    setErrorMessage(null);
     setSigningIn(true);
     
     try {
-      // Önce framework'ün hazır olduğundan emin ol
-      // sdk.ready() yerine context'i bir kez almayı dene
-      try {
-        await sdk.context;
-      } catch {
-        // Context alamazsak sorun değil, devam et
+      if (!sdk || !sdk.actions || typeof sdk.actions.signIn !== 'function') {
+        throw new Error("Farcaster SDK not initialized properly");
       }
+
+      // Warpcast'in SignIn metodunu çağır - bu kullanıcının Farcaster hesabını doğrular
+      await sdk.actions.signIn({ 
+        nonce: Date.now().toString() 
+      });
       
-      // signIn dene
-      await sdk.actions.signIn({ nonce: Date.now().toString() });
-      
-      // Kısa bir bekleme
+      // Kısa bekle
       await new Promise(r => setTimeout(r, 500));
       
-      // Context'i al
+      // Context'i al ve kullanıcı bilgisini güncelle
       const success = await getFarcasterContext();
       
-      // Başarılı değilse ve deneme sayısı < 3 ise tekrar dene
-      if (!success && retryCount < 3) {
-        setRetryCount(prev => prev + 1);
-        setTimeout(() => signInWithFarcaster(), 1000);
+      if (!success) {
+        console.warn("No user found after sign-in. Retrying...");
+        // Tekrar context almayı dene
+        setTimeout(async () => {
+          await getFarcasterContext();
+        }, 1000);
       }
     } catch (err) {
-      console.error("Farcaster sign in error:", err);
+      console.error("Failed to sign in with Farcaster:", err);
+      setErrorMessage(err instanceof Error ? err.message : "Failed to connect with Farcaster");
     } finally {
       setSigningIn(false);
     }
-  }, [getFarcasterContext, retryCount, signingIn]);
+  }, [getFarcasterContext, signingIn]);
 
+  // Sayfa yüklendiğinde ve focus değiştiğinde context'i kontrol et
   React.useEffect(() => {
+    if (!isInMiniApp()) return;
+
     // İlk yükleme - context'i kontrol et
     getFarcasterContext();
     
-    // Warpcast event listener ekle
-    const checkFarcasterState = () => {
-      getFarcasterContext();
-    };
+    // Warpcast mini-app içinde olduğumuzdan emin ol ve SDK ready işaretini yap
+    if (typeof sdk?.actions?.ready === 'function') {
+      sdk.actions.ready().catch(e => console.warn("Ready call failed:", e));
+    }
     
     // Pencere odağını geri aldığında context'i yenile
     if (typeof window !== 'undefined') {
-      window.addEventListener('focus', checkFarcasterState);
-      return () => window.removeEventListener('focus', checkFarcasterState);
+      window.addEventListener('focus', getFarcasterContext);
+      return () => window.removeEventListener('focus', getFarcasterContext);
     }
   }, [getFarcasterContext]);
   
-  // Warpcast içinde HER ZAMAN buton göster
+  // Warpcast içinde butonu göster
   if (isWarpcastEnv() || isInMiniApp()) {
     // Eğer Farcaster kullanıcısı varsa profil göster
     if (fcUser && fcUser.fid) {
@@ -124,11 +130,10 @@ export default function WalletButton() {
               className="w-7 h-7 rounded-full border border-gray-700"
             />
           )}
-          <span className="font-semibold text-base">{fcUser.displayName || fcUser.username || `FID: ${fcUser.fid}`}</span>
+          <span className="font-semibold text-base truncate max-w-[140px]">{fcUser.displayName || fcUser.username || `FID: ${fcUser.fid}`}</span>
           <button
             onClick={() => {
-              setFcUser(null); // Kullanıcı bilgisini temizle
-              setRetryCount(0); // Deneme sayısını sıfırla
+              setFcUser(null);
             }}
             className="ml-2 p-1 rounded hover:bg-gray-800 transition-colors"
             title="Change Account"
@@ -141,14 +146,20 @@ export default function WalletButton() {
     
     // Farcaster kullanıcısı yoksa veya disconnect edildiyse giriş butonu göster
     return (
-      <button
-        onClick={signInWithFarcaster}
-        className="flex items-center gap-2 px-4 py-3 rounded-lg text-base font-medium bg-[#624DE3] text-white hover:bg-[#5341D2] justify-center"
-        disabled={signingIn}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
-        {signingIn ? 'Signing in...' : 'Sign in with Farcaster'}
-      </button>
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={signInWithFarcaster}
+          className="flex items-center gap-2 px-4 py-3 rounded-lg text-base font-medium bg-[#624DE3] text-white hover:bg-[#5341D2] justify-center w-full"
+          disabled={signingIn}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+          {signingIn ? 'Connecting...' : 'Sign in with Farcaster'}
+        </button>
+        
+        {errorMessage && (
+          <p className="text-sm text-red-500 mt-1 text-center">{errorMessage}</p>
+        )}
+      </div>
     );
   }
 
@@ -188,7 +199,7 @@ export default function WalletButton() {
         onClick={() => connect({ connector: connectors[0] })}
         className="flex items-center gap-2 px-4 py-3 rounded-lg text-base font-medium bg-purple-700 text-white hover:bg-purple-800"
       >
-        Cüzdan Bağla
+        Connect Wallet
       </button>
       <a
         href={`https://warpcast.com/~/embed?url=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`}
