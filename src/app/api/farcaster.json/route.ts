@@ -9,21 +9,24 @@ export async function GET() {
     // Visit https://warpcast.com/~/developers/frames to generate them
     accountAssociation: {
       "header": "eyJmaWQiOjg2NDc5MywidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweENjZTJFMjI5NzNmMUY1MTA5MjQzQTZiNkREZTdBNDk4QzlENjYzNjYifQ",
-    "payload": "eyJkb21haW4iOiJvdXJzZWx2ZXMtcmVjb2duaXplZC1zdWJzdGl0dXRlLWNhc2V5LnRyeWNsb3VkZmxhcmUuY29tIn0",
-    "signature": "MHhjYmRjZDY5MmE3YTgyNGNiNzZlYThlY2ViZmZkZGQ4YmE3NGZhZGUwMDcxMzkxM2Q3OWU3MTliZDRiNmQwZmU0NTdjNGU2Njk3NzE5ZGI0ZDIwOTViZGJhZWVhNTlmYzUwYTgxMGNhOWZlYTFlODZjMzY2NjU4NWU4OTA0OWY2NzFi"
-  },
+      "payload": "eyJkb21haW4iOiJtb25hZC1jb3VudGVyLnZlcmNlbC5hcHAifQ",
+      "signature": "MHgyMjMyYWRmMWY5NTJiN2UxM2UwYzU3YTdlNGNiNmNlODNhNWIzMjk5ZDY1YjQyZjJkNDZiY2FmNmZmZmYyM2ZhNThiZjRkNGU2OThmYTM4OWVlM2RhNmIwYjZkODAyNjdmOGMyMWEyNDIwMDhkM2RlMjlkNjMxMzYyYjI4NjUwMzFj"
+    },
     frame: {
       version: "1",
       name: "Monad Counter",
-      iconUrl: `${appUrl}/images-png/icon.png`, // Icon of the app in the app store
-      homeUrl: `${appUrl}`, // Default launch URL
-      imageUrl: `${appUrl}/images-png/feed.png`, // Default image to show if shared in a feed.
-      screenshotUrls: [], // Visual previews of the app
-      tags: ["monad", "counter", "blockchain", "web3", "on-chain"], // Descriptive tags for search
+      description: "On-chain counter mini-app for Monad & Farcaster.",
+      iconUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
+      homeUrl: appUrl,
+      imageUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
+      screenshotUrls: [
+        "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png"
+      ],
+      tags: ["monad", "counter", "blockchain", "web3", "on-chain"],
       primaryCategory: "utility",
       buttonTitle: "Launch Counter",
-      splashImageUrl: `${appUrl}/images-png/splash.png`, // URL of image to show on loading screen.	
-      splashBackgroundColor: "#9747FF", // Hex color code to use on loading screen.
+      splashImageUrl: "https://i.ibb.co/k6KCDHpB/counter-app-logo-dark-bakcground-and-in-logo-add-text-monad-counter-purple-logo-and-clean-backgroun.png",
+      splashBackgroundColor: "#181028"
     }
   };
 
