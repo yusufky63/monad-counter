@@ -288,8 +288,6 @@ function WarpcastCounter() {
         });
         // Still try to refresh data after a delay
         setTimeout(fetchContractData, 5000);
-      } else {
-        toast.error("Error checking transaction", { id: "increment-error", duration: 3000 });
       }
     }
   };
