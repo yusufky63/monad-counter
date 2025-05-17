@@ -15,9 +15,9 @@ export const FarcasterShare: React.FC<FarcasterShareProps> = ({ counterValue }) 
 
   if (!isWarpcastEnv()) return null;
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    actions.composeCast({
+    await actions.composeCast({
       text: `I just incremented the Monad Counter to ${counterValue}! 🚀\nTry it yourself: ${appUrl}`
     });
   };
@@ -61,6 +61,17 @@ export const FarcasterActionButtons: React.FC<FarcasterShareProps> = ({ counterV
     <div className="flex flex-row gap-2 w-full max-w-xs px-2 my-4 mx-auto">
       <FarcasterShare counterValue={counterValue} />
       <FarcasterAdd />
+    </div>
+  );
+};
+
+export const FarcasterShareFooter: React.FC<FarcasterShareProps> = ({ counterValue }) => {
+  if (!isWarpcastEnv()) return null;
+  return (
+    <div className="w-full flex justify-center mt-4">
+      <div className="max-w-xs w-full">
+        <FarcasterShare counterValue={counterValue} />
+      </div>
     </div>
   );
 }; 

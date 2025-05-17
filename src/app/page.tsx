@@ -10,7 +10,7 @@ import AccountModal from "./common/AccountModal";
 import HowItWorksModal from "./components/HowItWorksModal";
 import { FarcasterWrapper } from "./components/FarcasterWrapper";
 import WalletButton from "./components/WalletButton";
-import { FarcasterActionButtons } from "./components/FarcasterActions";
+import { FarcasterShareFooter } from "./components/FarcasterActions";
 
 // Utils
 import { getContractAddress } from "./utils/ContractAddresses";
@@ -108,6 +108,13 @@ function WarpcastCounter() {
   
   const chainId = useChainId();
   const { data: walletClient } = useWalletClient();
+  
+  // Custom hook for counter data
+  const { leaderboard, loading, error } = useCounter({
+    chainId: MONAD_CHAIN_ID,
+    address: "0x0000000000000000000000000000000000000000",
+    isConnected: false,
+  });
   
   // Read contract data
   const fetchContractData = async () => {
@@ -216,7 +223,7 @@ function WarpcastCounter() {
       toast.dismiss("increment-transaction");
       if (!(error instanceof Error && error.message?.includes('eth_getTransactionReceipt'))) {
         if (error instanceof Error && error.message?.includes('User rejected the request')) {
-          toast.error('Transaction rejected by user.', { id: 'increment-error' });
+          toast.error('Transaction cancelled by user.', { id: 'increment-error' });
         } else if (error instanceof Error && error.message?.includes('The Provider does not support the requested method')) {
           // Do not show any toast for this error
         } else {
@@ -255,13 +262,6 @@ function WarpcastCounter() {
       });
     }
   }, [isSuccess, txError]);
-  
-  // Custom hook for counter data
-  const { leaderboard, loading, error } = useCounter({
-    chainId: MONAD_CHAIN_ID,
-    address: "0x0000000000000000000000000000000000000000",
-    isConnected: false,
-  });
   
   // Show error if exists
   React.useEffect(() => {
@@ -308,7 +308,7 @@ function WarpcastCounter() {
         </div>
 
         {/* Main Content - Counter */}
-        <div className="flex-1 flex items-center justify-center w-full px-3 max-w-lg mx-auto">
+        <div className="flex-1 flex flex-col items-center justify-center w-full px-3 max-w-lg mx-auto">
           {/* Counter Display */}
           <div
             className={`relative overflow-hidden cursor-pointer py-8 px-4 rounded-2xl z-[1] w-full transition-transform hover:scale-102 active:scale-98 ${
@@ -362,7 +362,7 @@ function WarpcastCounter() {
                     }`}
                   >
                         <p className="text-xs mt-1 opacity-60">
-                          {fee ? `Cost: ${fee.toString() || '0'} wei` : "Loading..."}
+                          {fee ? `Fee: ${fee.toString()}` : "Loading fee..."}
                         </p>
                   </div>
                 )}
@@ -370,8 +370,6 @@ function WarpcastCounter() {
             </div>
           </div>
         </div>
-        {/* Farcaster Action Buttons */}
-        <FarcasterActionButtons counterValue={displayedCounter} />
 
         {/* Bottom Section - Footer with links */}
         <div className="w-full p-4 mt-auto">
@@ -390,34 +388,35 @@ function WarpcastCounter() {
             </button>
           </div>
         </div>
+
+        {/* Farcaster Share Footer */}
+        <FarcasterShareFooter counterValue={displayedCounter} />
+
+        {/* Modals */}
+        {isStatsModalOpen && (
+          <LeaderboardModal 
+            onClose={() => setIsStatsModalOpen(false)}
+            leaderboard={leaderboard || []}
+            loading={loading}
+            theme={theme}
+            address={address}
+          />
+        )}
+        {isAccountModalOpen && (
+          <AccountModal
+            isOpen={isAccountModalOpen}
+            onClose={() => setIsAccountModalOpen(false)}
+            theme={theme}
+          />
+        )}
+        {isHowItWorksOpen && (
+          <HowItWorksModal
+            onClose={() => setIsHowItWorksOpen(false)}
+            theme={theme}
+            fee={fee}
+          />
+        )}
       </div>
-
-      {/* Modals */}
-      {isStatsModalOpen && (
-        <LeaderboardModal 
-          onClose={() => setIsStatsModalOpen(false)}
-          leaderboard={leaderboard || []}
-          loading={loading}
-          theme={theme}
-          address={address}
-        />
-      )}
-
-      {isAccountModalOpen && (
-        <AccountModal
-          isOpen={isAccountModalOpen}
-          onClose={() => setIsAccountModalOpen(false)}
-          theme={theme}
-        />
-      )}
-
-      {isHowItWorksOpen && (
-        <HowItWorksModal
-          onClose={() => setIsHowItWorksOpen(false)}
-          theme={theme}
-          fee={fee}
-        />
-      )}
     </FarcasterWrapper>
   );
 }
