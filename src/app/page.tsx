@@ -186,7 +186,8 @@ function WarpcastCounter() {
     } finally {
       setIsConnecting(false);
     }
-  }, [isConnected, isConnecting, isInWarpcast, connect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConnected, isInWarpcast, connect]); // Removed isConnecting to prevent loops
 
   // Add wallet state synchronization
   const [walletStateVersion, setWalletStateVersion] = useState(0);
@@ -325,7 +326,7 @@ function WarpcastCounter() {
     
     const interval = setInterval(fetchContractData, 15000);
     return () => clearInterval(interval);
-  }, [fetchContractData]);
+  }, []); // Removed fetchContractData from dependencies to prevent loops
 
   // Auto switch to Monad Testnet when connected but on wrong chain
   useEffect(() => {

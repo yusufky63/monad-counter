@@ -106,14 +106,37 @@ export default function WalletButton() {
     };
 
     autoConnect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     connect,
     connectors,
     isConnected,
-    isConnecting,
-    connectionAttempts,
     manualDisconnect,
+    // Removed isConnecting and connectionAttempts from dependencies to prevent loops
   ]);
+
+  // Separate useEffect to handle connection attempts and prevent loops
+  useEffect(() => {
+    if (connectionAttempts > 0 && !isConnecting && !isConnected) {
+      const maxRetries = 3;
+      if (connectionAttempts < maxRetries) {
+        const backoffDelay = Math.pow(2, connectionAttempts) * 1000;
+        const timer = setTimeout(() => {
+          // Only retry if still not connected
+          if (!isConnected) {
+            console.log(`Retrying connection attempt ${connectionAttempts + 1}/${maxRetries}`);
+            setIsConnecting(true);
+          }
+        }, backoffDelay);
+        
+        return () => clearTimeout(timer);
+      } else {
+        // Reset after max retries
+        setConnectionAttempts(0);
+        setIsConnecting(false);
+      }
+    }
+  }, [connectionAttempts, isConnecting, isConnected]);
 
   // Check if we're on the right chain when wallet is connected
   useEffect(() => {
@@ -205,15 +228,14 @@ export default function WalletButton() {
     setManualDisconnect(true);
     // Store disconnect time
     disconnectTimeRef.current = Date.now();
+    // Reset connection attempts
+    setConnectionAttempts(0);
     // Actually disconnect
     disconnect();
 
     // Explicitly reset state in case disconnect callback is delayed
     setTimeout(() => {
-      if (isConnected) {
-        console.log("Forcing disconnect state update");
-        setIsConnecting(false);
-      }
+      setIsConnecting(false);
     }, 1000);
   };
 
