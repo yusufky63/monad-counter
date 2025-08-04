@@ -53,7 +53,7 @@ const UserStats = ({
           theme={theme}
           icon="🎯"
           value={userStats.contribution}
-          label=" Contributions"
+          label=" Your Contributions"
           color="text-blue-500"
         
         />

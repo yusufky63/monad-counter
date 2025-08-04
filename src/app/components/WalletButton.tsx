@@ -245,7 +245,6 @@ export default function WalletButton() {
       ? `${address.slice(0, 3)}...${address.slice(-2)}`
       : "";
     const isCorrectChain = chainId === monadTestnet.id;
-    const chainName = isCorrectChain ? "Monad" : `Chain ${chainId}`;
     
     return (
       <div className={`flex items-center gap-2 px-2 py-1 rounded-xl text-white shadow border text-xs ${
@@ -264,9 +263,7 @@ export default function WalletButton() {
         >
           {shortAddress}
         </span>
-        <span className="text-xs opacity-75">
-          ({chainName})
-        </span>
+      
         {!isCorrectChain && (
           <button
             onClick={() => switchChain?.({ chainId: monadTestnet.id })}

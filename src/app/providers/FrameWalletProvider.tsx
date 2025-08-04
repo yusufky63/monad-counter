@@ -26,6 +26,8 @@ export const config = createConfig({
     injected(), // Tarayıcı cüzdanları için
     metaMask(), // MetaMask özel desteği
   ],
+  // Add custom configuration for better Farcaster compatibility
+  ssr: false, // Disable SSR for Farcaster compatibility
 });
 
 // Sade sorgu yapılandırması

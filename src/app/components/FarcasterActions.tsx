@@ -188,6 +188,7 @@ export function AddToHomeButton() {
   const [addSuccess, setAddSuccess] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isAlreadyAdded, setIsAlreadyAdded] = useState(false);
 
   // Check if app is already added on mount
@@ -201,27 +202,7 @@ export function AddToHomeButton() {
   if (!isWarpcastEnv()) return null;
 
   // Don't show button if already added
-  if (isAlreadyAdded) {
-    return (
-      <div className="mt-2 py-2 px-3 bg-green-600/20 text-green-400 text-sm rounded-md flex items-center justify-center gap-2">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-          <polyline points="22 4 12 14.01 9 11.01"></polyline>
-        </svg>
-        Already added to Farcaster Home
-      </div>
-    );
-  }
+
 
   const handleAddToHome = async () => {
     try {

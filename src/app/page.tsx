@@ -462,8 +462,49 @@ function WarpcastCounter() {
         account: address, // Explicitly specify the account
       };
       
-      // Send transaction
-      await mutation.writeContractAsync(transactionConfig);
+      // Check if we're using Farcaster connector and handle accordingly
+      if (isInFarcaster) {
+        // For Farcaster, we need to handle the transaction differently
+        // because the connector doesn't have getChainId method
+        console.log("Farcaster environment detected, using special transaction handling");
+        
+        // For Farcaster, use a simpler transaction approach
+        // that doesn't rely on getChainId
+        try {
+          // Use a more direct approach for Farcaster
+          const result = await mutation.writeContractAsync({
+            address: contractAddress,
+            abi: counterABI,
+            functionName: "incrementCounter",
+            value: feeValue,
+            account: address,
+            // Don't specify chainId for Farcaster to avoid getChainId issues
+          });
+          
+          console.log("Farcaster transaction sent successfully:", result);
+        } catch (error) {
+          console.error("Farcaster transaction error:", error);
+          
+          // Check if it's a getChainId error
+          if (error instanceof Error && error.message.includes("getChainId")) {
+            console.log("Detected getChainId error, trying alternative approach");
+            
+            // Try without account specification
+            await mutation.writeContractAsync({
+              address: contractAddress,
+              abi: counterABI,
+              functionName: "incrementCounter",
+              value: feeValue,
+              // Remove account specification for Farcaster
+            });
+          } else {
+            throw error;
+          }
+        }
+      } else {
+        // For regular wallets, use normal transaction
+        await mutation.writeContractAsync(transactionConfig);
+      }
       
       // Dismiss loading toast
       toast.dismiss("tx-loading");
