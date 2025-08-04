@@ -3,7 +3,14 @@ import { ThemeContext } from "../context/ThemeContext";
 
 const MIN_CONTRIBUTIONS_FOR_LEADERBOARD = 0; // Minimum number of contributions
 
-const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false }) => {
+const Leaderboard = ({ 
+  leaderboard = [], 
+  userAddress, 
+  userStats, 
+  userRank, 
+  loading, 
+  hideTitle = false 
+}) => {
   console.log(leaderboard);
   const { theme } = useContext(ThemeContext);
   const [page, setPage] = useState(0);
@@ -13,15 +20,32 @@ const Leaderboard = ({ leaderboard = [], userAddress, loading, hideTitle = false
   const processedLeaderboard = useMemo(() => {
     if (!Array.isArray(leaderboard)) return [];
     console.log('[Leaderboard.js] Incoming data:', leaderboard);
-    return leaderboard
+    
+    let processedData = leaderboard
       .filter(user => 
         user && 
         user.userAddress && 
         user.userAddress !== '0x0000000000000000000000000000000000000000' &&
         Number(user.contributions) >= MIN_CONTRIBUTIONS_FOR_LEADERBOARD
-      )
-      .sort((a, b) => Number(b.contributions) - Number(a.contributions));
-  }, [leaderboard]);
+      );
+    
+    // Add user to leaderboard if they have contributions but aren't in the list
+    if (userStats && userRank && userAddress && userStats.contribution > 0) {
+      const userInLeaderboard = processedData.find(
+        user => user.userAddress?.toLowerCase() === userAddress.toLowerCase()
+      );
+      
+      if (!userInLeaderboard) {
+        processedData.push({
+          userAddress: userAddress,
+          contributions: userStats.contribution,
+          lastUpdate: Date.now()
+        });
+      }
+    }
+    
+    return processedData.sort((a, b) => Number(b.contributions) - Number(a.contributions));
+  }, [leaderboard, userStats, userRank, userAddress]);
 
   // Loading skeleton UI
   if (loading) {

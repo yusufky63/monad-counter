@@ -1,6 +1,7 @@
 import React from "react";
 import Leaderboard from "./Leaderboard";
 import { FiX } from "react-icons/fi";
+import UserStats from "./UserStats";
 
 const LeaderboardModal = ({
   theme,
@@ -8,12 +9,21 @@ const LeaderboardModal = ({
   leaderboard,
   address,
   loading,
+  userStats,
+  userRank,
+  rankDetails,
+  contributionTarget,
 }) => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="fixed inset-0 flex items-center justify-center p-2 md:p-4">
         {/* Backdrop */}
-        <div className={`absolute inset-0 ${theme === "dark" ? "bg-black/50" : "bg-black/20"} backdrop-blur-sm`} onClick={onClose} />
+        <div
+          className={`absolute inset-0 ${
+            theme === "dark" ? "bg-black/50" : "bg-black/20"
+          } backdrop-blur-sm`}
+          onClick={onClose}
+        />
 
         {/* Modal */}
         <div
@@ -31,9 +41,11 @@ const LeaderboardModal = ({
             }`}
           >
             <div className="flex items-center justify-between">
-              <h3 className={`text-base font-medium tracking-tight ${
-                theme === "dark" ? "text-white" : "text-gray-800"
-              }`}>
+              <h3
+                className={`text-base font-medium tracking-tight ${
+                  theme === "dark" ? "text-white" : "text-gray-800"
+                }`}
+              >
                 <span className="bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
                   Leaderboard
                 </span>
@@ -50,12 +62,21 @@ const LeaderboardModal = ({
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+            <UserStats 
+              userStats={userStats} 
+              userRank={userRank}
+              contributionTarget={contributionTarget}
+              rankDetails={rankDetails}
+            />
+
             <Leaderboard
               theme={theme}
               loading={loading}
               leaderboard={leaderboard}
               userAddress={address}
+              userStats={userStats}
+              userRank={userRank}
               hideTitle={true}
             />
           </div>
@@ -65,4 +86,4 @@ const LeaderboardModal = ({
   );
 };
 
-export default LeaderboardModal; 
+export default LeaderboardModal;

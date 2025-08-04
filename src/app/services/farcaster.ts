@@ -28,6 +28,7 @@ export interface FarcasterContext {
 export interface FarcasterActions {
   ready: () => Promise<void>;
   addFrame: () => Promise<void>;
+  addMiniApp: () => Promise<void>;
   composeCast: (options: { text: string }) => Promise<void>;
   viewProfile: (options: { fid: number }) => Promise<void>;
 }
@@ -57,6 +58,12 @@ class FarcasterSDK {
       if (typeof window !== 'undefined' && window.parent !== window) {
         window.parent.postMessage({ type: 'addFrame' }, '*');
         console.log("Farcaster: addFrame action sent");
+      }
+    },
+    addMiniApp: async () => {
+      if (typeof window !== 'undefined' && window.parent !== window) {
+        window.parent.postMessage({ type: 'addMiniApp' }, '*');
+        console.log("Farcaster: addMiniApp action sent");
       }
     },
     composeCast: async (options: { text: string }) => {
@@ -101,8 +108,28 @@ class FarcasterSDK {
 // Export singleton instance
 export const farcasterSDK = new FarcasterSDK();
 
+// Enhanced SDK with additional actions
+const enhancedSdk = {
+  ...sdk,
+  actions: {
+    ...sdk.actions,
+    // Add missing addMiniApp if not present
+    addMiniApp: sdk.actions.addMiniApp || (async () => {
+      if (typeof window !== 'undefined' && window.parent !== window) {
+        window.parent.postMessage({ type: 'addMiniApp' }, '*');
+        console.log("Farcaster: addMiniApp action sent");
+      }
+    })
+  }
+};
+
+// Helper function to check if in mini app environment
+export const isInMiniApp = () => {
+  return typeof window !== 'undefined' && window.parent !== window;
+};
+
 // Farcaster SDK context
-const FarcasterContext = React.createContext(sdk);
+const FarcasterContext = React.createContext(enhancedSdk);
 export const useFarcaster = () => useContext(FarcasterContext);
 
-export default sdk; 
+export default enhancedSdk; 

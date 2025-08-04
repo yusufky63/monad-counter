@@ -10,7 +10,6 @@ const CACHE_DURATION = {
   CONTRIBUTION: 300, // 5 dakika
 };
 
-const MIN_CONTRIBUTIONS_FOR_LEADERBOARD = 1;
 
 const initialData = {
   userStats: null,
@@ -32,7 +31,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
   const [data, setData] = useState(initialData);
   const [shouldRefresh, setShouldRefresh] = useState(false);
   const [lastChainId, setLastChainId] = useState(chainId);
-  
+
   // Sabit Monad Testnet RPC Provider (hiçbir browser wallet gerektirmez)
   const provider = useMemo(() => {
     try {
@@ -44,7 +43,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
       return null;
     }
   }, []);
-  
+
   // Contract address memoization
   const contractAddress = useMemo(() => {
     if (!chainId) return null;
@@ -56,7 +55,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
       return null;
     }
   }, [chainId]);
-  
+
   // Create ethers contract instance
   const ethersContract = useMemo(() => {
     if (!provider || !contractAddress) return null;
@@ -93,15 +92,18 @@ export const useCounter = ({ chainId, address, isConnected }) => {
   const fetchUserStats = useCallback(async () => {
     try {
       if (!address || !ethersContract) return null;
-      
+
       setLoading(true);
-      
-      const userContribution = await ethersContract.userContributions(address);
+
+      // Use getUserStats function instead of userContributions
+      const result = await ethersContract.getUserStats(address);
       const userStats = {
         address,
-        contribution: userContribution.toNumber(),
+        contribution: result.contributions.toNumber(),
+        rank: result.rank.toNumber(),
+        inLeaderboard: result.inLeaderboard,
       };
-      
+
       return userStats;
     } catch (error) {
       console.error("Error fetching user stats:", error);
@@ -113,18 +115,16 @@ export const useCounter = ({ chainId, address, isConnected }) => {
   const fetchLeaderboard = useCallback(async () => {
     try {
       if (!ethersContract) return [];
-      
+
       // Get leaderboard size
       const leaderboardSize = await ethersContract.leaderboardSize();
-      console.log('[LEADERBOARD] leaderboardSize:', leaderboardSize.toString());
-      
+
       // If leaderboardSize is zero, return empty array
       if (leaderboardSize.eq(0)) return [];
-      
+
       // Use the FULL leaderboardSize value for getTopUsers
       const leaderboardData = await ethersContract.getTopUsers(leaderboardSize);
-      console.log('[LEADERBOARD] getTopUsers raw:', leaderboardData);
-      
+
       // Format the data to match Leaderboard.js expectations
       const formatted = leaderboardData.map((entry) => {
         // Map contract fields to component expected fields
@@ -134,118 +134,87 @@ export const useCounter = ({ chainId, address, isConnected }) => {
           lastUpdate: entry.lastUpdate?.toNumber?.() ?? 0,
         };
       });
-      
-      console.log('[LEADERBOARD] formatted:', formatted);
-      
+
       // Sort by contributions (highest first)
-      const sorted = formatted.sort((a, b) => b.contributions - a.contributions);
-      console.log('[LEADERBOARD] sorted:', sorted);
-      
+      const sorted = formatted.sort(
+        (a, b) => b.contributions - a.contributions
+      );
+
       return sorted;
     } catch (error) {
-      console.error('[LEADERBOARD] Error fetching leaderboard:', error);
+      console.error("[LEADERBOARD] Error fetching leaderboard:", error);
       // Return empty array on error instead of throwing
       return [];
     }
   }, [ethersContract]);
 
-  // Update user rank
+  // Update user rank - calculate client-side due to contract sync issues
   const updateUserRank = useCallback(
     (leaderboard, userStats) => {
-      if (!userStats || !leaderboard.length) return null;
-
-      // Find the user in the leaderboard
-      const userInLeaderboard = leaderboard.find(
-        (entry) => entry.userAddress.toLowerCase() === address.toLowerCase()
-      );
-
-      // If user is in the leaderboard, use that rank
-      if (userInLeaderboard) {
-        return userInLeaderboard.rank;
-      }
-
-      // Otherwise calculate a virtual rank
-      const userContribution = userStats.contribution;
+      if (!userStats || !address) return null;
       
-      // If user has no contributions, they're unranked
-      if (userContribution < MIN_CONTRIBUTIONS_FOR_LEADERBOARD) {
-        return null;
+      // First try contract rank if available
+      if (userStats.rank > 0) {
+        return userStats.rank;
       }
-
-      // Find where user would be in the leaderboard
-      let virtualRank = leaderboard.length + 1;
-      for (let i = 0; i < leaderboard.length; i++) {
-        if (userContribution > leaderboard[i].contributions) {
-          virtualRank = i + 1;
-          break;
+      
+      // If contract rank is 0 but user has contributions, calculate client-side rank
+      if (userStats.contribution > 0 && leaderboard.length > 0) {
+        // Find user's position based on their contributions
+        let rank = 1;
+        for (const entry of leaderboard) {
+          if (userStats.contribution < entry.contributions) {
+            rank++;
+          }
+        }
+        
+        // If user should be in top 50, return the rank
+        if (rank <= 50) {
+          return rank;
         }
       }
-
-      return virtualRank;
+      
+      return null;
     },
     [address]
   );
 
-  // Get contribution needed for next rank
-  const getContributionTarget = useCallback(
-    (leaderboard, userStats, userRank) => {
-      if (!userStats || !leaderboard.length || !userRank) return null;
+  // Get contribution target from contract
+  const fetchContributionTarget = useCallback(async () => {
+    try {
+      if (!address || !ethersContract) return null;
 
-      // If user is already #1, no target needed
-      if (userRank === 1) return null;
-
-      const userContribution = userStats.contribution;
-      let targetContribution = null;
-
-      // Find the person ahead of the user
-      if (userRank <= leaderboard.length) {
-        // User is in the leaderboard - find person at rank above
-        const targetRank = userRank - 1;
-        const targetPerson = leaderboard.find((e) => e.rank === targetRank);
-        if (targetPerson) {
-          targetContribution = targetPerson.contributions;
-        }
-      } else if (leaderboard.length > 0) {
-        // User is outside leaderboard - target the last person
-        targetContribution = leaderboard[leaderboard.length - 1].contributions;
-      }
-
-      if (targetContribution !== null) {
-        const needed = Math.max(1, targetContribution - userContribution + 1);
-        return {
-          current: userContribution,
-          target: targetContribution,
-          needed: needed,
-        };
-      }
-
-      return null;
-    },
-    []
-  );
-
-  // Get detailed rank info
-  const getRankDetails = useCallback(
-    (leaderboard, userRank, userStats) => {
-      if (!leaderboard.length || !userStats) return null;
-
-      const totalParticipants =
-        leaderboard.length +
-        (userRank > leaderboard.length && userStats.contribution >= MIN_CONTRIBUTIONS_FOR_LEADERBOARD
-          ? 1
-          : 0);
-
+      const result = await ethersContract.getContributionTarget(address);
+      
       return {
-        rank: userRank || "Unranked",
-        totalParticipants,
-        percentile:
-          userRank && totalParticipants
-            ? Math.floor((userRank / totalParticipants) * 100)
-            : null,
+        current: result.current.toNumber(),
+        target: result.target.toNumber(),
+        needed: result.remaining.toNumber(),
+        hasAchievedTarget: result.remaining.eq(0),
       };
-    },
-    []
-  );
+    } catch (error) {
+      console.error("Error fetching contribution target:", error);
+      return null;
+    }
+  }, [address, ethersContract]);
+
+  // Get detailed rank info from contract
+  const fetchRankDetails = useCallback(async () => {
+    try {
+      if (!address || !ethersContract) return null;
+
+      const result = await ethersContract.getUserRankDetails(address);
+      
+      return {
+        rank: result.rank.toNumber() > 0 ? result.rank.toNumber() : null,
+        nextRankDiff: result.nextRankDiff.toNumber(),
+        nextRankAddress: result.nextRankAddress,
+      };
+    } catch (error) {
+      console.error("Error fetching rank details:", error);
+      return null;
+    }
+  }, [address, ethersContract]);
 
   // Main data refresh function
   const refreshData = useCallback(async () => {
@@ -274,20 +243,25 @@ export const useCounter = ({ chainId, address, isConnected }) => {
       }
 
       // Refresh leaderboard if needed
-      if (needsRefresh(data.lastUpdate.leaderboard, CACHE_DURATION.LEADERBOARD)) {
+      if (
+        needsRefresh(data.lastUpdate.leaderboard, CACHE_DURATION.LEADERBOARD)
+      ) {
         const leaderboard = await fetchLeaderboard();
-        console.log('[LEADERBOARD] refreshData fetched:', leaderboard);
+        console.log("[LEADERBOARD] refreshData fetched:", leaderboard);
         updatedData.leaderboard = leaderboard;
         updates.leaderboard = now;
       }
 
-      // Update derived data if we have all needed info
-      if (updatedData.userStats && updatedData.leaderboard.length && address && isConnected) {
-        // Update user rank
-        const userRank = updateUserRank(updatedData.leaderboard, updatedData.userStats);
+      // Update derived data if we have user stats
+      if (updatedData.userStats && address && isConnected) {
+        // Update user rank (already included in userStats)
+        const userRank = updateUserRank(
+          updatedData.leaderboard,
+          updatedData.userStats
+        );
         updatedData.userRank = userRank;
 
-        // Get contribution target
+        // Get contribution target from contract
         if (
           needsRefresh(
             data.lastUpdate.contribution,
@@ -295,21 +269,13 @@ export const useCounter = ({ chainId, address, isConnected }) => {
           ) ||
           !data.contributionTarget
         ) {
-          const contributionTarget = getContributionTarget(
-            updatedData.leaderboard,
-            updatedData.userStats,
-            userRank
-          );
+          const contributionTarget = await fetchContributionTarget();
           updatedData.contributionTarget = contributionTarget;
           updates.contribution = now;
         }
 
-        // Get rank details
-        const rankDetails = getRankDetails(
-          updatedData.leaderboard,
-          userRank,
-          updatedData.userStats
-        );
+        // Get rank details from contract
+        const rankDetails = await fetchRankDetails();
         updatedData.rankDetails = rankDetails;
       }
 
@@ -332,8 +298,8 @@ export const useCounter = ({ chainId, address, isConnected }) => {
     fetchUserStats,
     fetchLeaderboard,
     updateUserRank,
-    getContributionTarget,
-    getRankDetails,
+    fetchContributionTarget,
+    fetchRankDetails,
   ]);
 
   // Process auto-refresh requests

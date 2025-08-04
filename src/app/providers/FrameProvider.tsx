@@ -1,13 +1,14 @@
 "use client";
 
 import { FrameContext } from "@farcaster/frame-core/dist/context";
-import sdk from "@farcaster/frame-sdk";
+import enhancedSdk from "../services/farcaster";
 import {
   createContext,
   ReactNode,
   useContext,
   useEffect,
   useState,
+  useCallback,
 } from "react";
 import FrameWalletProvider from "./FrameWalletProvider";
 
@@ -16,7 +17,9 @@ interface FrameContextValue {
   isSDKLoaded: boolean;
   isEthProviderAvailable: boolean;
   error: string | null;
-  actions: typeof sdk.actions | null;
+  actions: typeof enhancedSdk.actions | null;
+  isInMiniApp: boolean;
+  user: { fid: number; username?: string; displayName?: string; pfpUrl?: string } | null;
 }
 
 const FrameProviderContext = createContext<FrameContextValue | undefined>(
@@ -37,39 +40,95 @@ interface FrameProviderProps {
 
 export function FrameProvider({ children }: FrameProviderProps) {
   const [context, setContext] = useState<FrameContext | null>(null);
-  const [actions, setActions] = useState<typeof sdk.actions | null>(null);
+  const [actions, setActions] = useState<typeof enhancedSdk.actions | null>(null);
   const [isEthProviderAvailable, setIsEthProviderAvailable] =
     useState<boolean>(false);
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isInMiniApp, setIsInMiniApp] = useState(false);
+  const [user, setUser] = useState<{ fid: number; username?: string; displayName?: string; pfpUrl?: string } | null>(null);
 
+  // Call ready() immediately when component mounts if in Farcaster environment
   useEffect(() => {
-    const load = async () => {
-      try {
-        const context = await sdk.context;
-        if (context) {
-          setContext(context as FrameContext);
-          setActions(sdk.actions);
-          setIsEthProviderAvailable(sdk.wallet?.ethProvider ? true : false);
-        } else {
-          setError("Failed to load Farcaster context");
+    const callReadyImmediate = async () => {
+      if (typeof window !== 'undefined' && window.parent !== window) {
+        try {
+          await enhancedSdk.actions.ready();
+          console.log("Early ready() call successful");
+        } catch (error) {
+          console.log("Early ready() call failed:", error);
         }
-        await sdk.actions.ready();
+      }
+    };
+    callReadyImmediate();
+  }, []);
+
+  // Function to detect if we're in Farcaster environment
+  const isInFarcaster = useCallback(() => {
+    return typeof window !== 'undefined' && window.parent !== window;
+  }, []);
+
+  // Farcaster SDK initialization
+  useEffect(() => {
+    const initializeSDK = async () => {
+      try {
+        // Check if we're in a Farcaster environment
+        const isMiniApp = isInFarcaster();
+        setIsInMiniApp(isMiniApp);
+        
+        if (isMiniApp) {
+          
+          // Call ready() immediately to hide splash screen
+          try {
+            await enhancedSdk.actions.ready();
+          } catch (readyError) {
+            console.error("Failed to call ready():", readyError);
+          }
+          
+          // Get context and user info
+          const context = await enhancedSdk.context;
+          if (context) {
+            setContext(context as FrameContext);
+            setActions(enhancedSdk.actions);
+            setIsEthProviderAvailable(!!enhancedSdk.wallet?.ethProvider);
+            
+            // Extract user info from context
+            if (context.user) {
+              setUser({
+                fid: context.user.fid,
+                username: context.user.username,
+                displayName: context.user.displayName,
+                pfpUrl: context.user.pfpUrl
+              });
+            }
+            
+            // Auto-add mini app on first load (if supported)
+            try {
+              const wasAdded = localStorage.getItem('monad-counter-miniapp-added');
+              if (!wasAdded) {
+                await enhancedSdk.actions.addMiniApp();
+                localStorage.setItem('monad-counter-miniapp-added', 'true');
+                console.log("Mini app automatically added");
+              }
+            } catch (addError) {
+              console.log("Auto add mini app failed:", addError);
+              // This is expected in development or if user rejects
+            }
+          }
+        } else {
+          console.log("Running in regular web environment");
+          setActions(null);
+        }
       } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Failed to initialize SDK"
-        );
         console.error("SDK initialization error:", err);
+        setError(err instanceof Error ? err.message : "SDK initialization failed");
+      } finally {
+        setIsSDKLoaded(true);
       }
     };
 
-    if (sdk && !isSDKLoaded) {
-      load().then(() => {
-        setIsSDKLoaded(true);
-        console.log("SDK loaded");
-      });
-    }
-  }, [isSDKLoaded]);
+    initializeSDK();
+  }, [isInFarcaster]);
 
   return (
     <FrameProviderContext.Provider
@@ -79,6 +138,8 @@ export function FrameProvider({ children }: FrameProviderProps) {
         isSDKLoaded,
         isEthProviderAvailable,
         error,
+        isInMiniApp,
+        user,
       }}
     >
       <FrameWalletProvider>{children}</FrameWalletProvider>

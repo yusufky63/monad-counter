@@ -6,31 +6,39 @@ import { createConfig, http, WagmiProvider } from "wagmi";
 import { monadTestnet } from "wagmi/chains";
 import { injected, metaMask } from "wagmi/connectors";
 
-// Create configuration with both Farcaster connector for warpcast
-// and multiple browser wallet connectors for better compatibility
+// Basit RPC yapılandırması
+const MONAD_RPC = "https://testnet-rpc.monad.xyz";
+
+// Warpcast dokümantasyonuna uygun basit config
 export const config = createConfig({
   chains: [monadTestnet],
   transports: {
-    [monadTestnet.id]: http("https://testnet-rpc.monad.xyz", {
-      batch: {
-        batchSize: 1, // Reduce batch size to avoid rate limiting
-        wait: 10,     // Add delay between requests
+    [monadTestnet.id]: http(MONAD_RPC, {
+      timeout: 20000, // Daha uzun timeout
+      retryCount: 3, // Hata durumunda tekrar dene
+      fetchOptions: {
+        cache: "no-cache", // Önbellek sorunlarını önle
       },
-      timeout: 15000, // Increase timeout
-      retryCount: 3,  // Add retries
     }),
   },
   connectors: [
-    // The ID for this connector will be 'farcaster' in the client
-    farcasterFrame(),
-    
-    // Browser wallet connectors
-    injected(),
-    metaMask(),
+    farcasterFrame(), // Farcaster için
+    injected(), // Tarayıcı cüzdanları için
+    metaMask(), // MetaMask özel desteği
   ],
 });
 
-const queryClient = new QueryClient();
+// Sade sorgu yapılandırması
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5000,
+      retry: 3,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+  },
+});
 
 export default function FrameWalletProvider({
   children,
@@ -42,4 +50,4 @@ export default function FrameWalletProvider({
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );
-} 
+}

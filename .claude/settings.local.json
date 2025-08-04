@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.farcaster.xyz)",
+      "WebFetch(domain:miniapps.farcaster.xyz)",
+      "WebFetch(domain:miniapps.farcaster.xyz)"
+    ],
+    "deny": []
+  }
+}
