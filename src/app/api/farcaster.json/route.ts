@@ -12,7 +12,7 @@ export async function GET() {
       "payload": "eyJkb21haW4iOiJtb25hZC1jb3VudGVyLnZlcmNlbC5hcHAifQ",
       "signature": "MHgyMjMyYWRmMWY5NTJiN2UxM2UwYzU3YTdlNGNiNmNlODNhNWIzMjk5ZDY1YjQyZjJkNDZiY2FmNmZmZmYyM2ZhNThiZjRkNGU2OThmYTM4OWVlM2RhNmIwYjZkODAyNjdmOGMyMWEyNDIwMDhkM2RlMjlkNjMxMzYyYjI4NjUwMzFj"
     },
-    frame: {
+    miniapp: {
       version: "1",
       name: "Monad Counter",
       description: "On-chain counter mini-app for Monad and Farcaster.",

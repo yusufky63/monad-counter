@@ -1,25 +1,13 @@
 "use client";
 
-import { FrameContext } from "@farcaster/frame-core/dist/context";
-import enhancedSdk from "../services/farcaster";
-import {
-  createContext,
-  ReactNode,
-  useContext,
-  useEffect,
-  useState,
-  useCallback,
-} from "react";
-import FrameWalletProvider from "./FrameWalletProvider";
+import React, { ReactNode, useContext, useEffect, useState, useCallback, createContext } from "react";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 interface FrameContextValue {
-  context: FrameContext | null;
   isSDKLoaded: boolean;
-  isEthProviderAvailable: boolean;
-  error: string | null;
-  actions: typeof enhancedSdk.actions | null;
   isInMiniApp: boolean;
   user: { fid: number; username?: string; displayName?: string; pfpUrl?: string } | null;
+  context: Awaited<typeof sdk.context> | null;
 }
 
 const FrameProviderContext = createContext<FrameContextValue | undefined>(
@@ -39,29 +27,10 @@ interface FrameProviderProps {
 }
 
 export function FrameProvider({ children }: FrameProviderProps) {
-  const [context, setContext] = useState<FrameContext | null>(null);
-  const [actions, setActions] = useState<typeof enhancedSdk.actions | null>(null);
-  const [isEthProviderAvailable, setIsEthProviderAvailable] =
-    useState<boolean>(false);
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isInMiniApp, setIsInMiniApp] = useState(false);
   const [user, setUser] = useState<{ fid: number; username?: string; displayName?: string; pfpUrl?: string } | null>(null);
-
-  // Call ready() immediately when component mounts if in Farcaster environment
-  useEffect(() => {
-    const callReadyImmediate = async () => {
-      if (typeof window !== 'undefined' && window.parent !== window) {
-        try {
-          await enhancedSdk.actions.ready();
-          console.log("Early ready() call successful");
-        } catch (error) {
-          console.log("Early ready() call failed:", error);
-        }
-      }
-    };
-    callReadyImmediate();
-  }, []);
+  const [context, setContext] = useState<Awaited<typeof sdk.context> | null>(null);
 
   // Function to detect if we're in Farcaster environment
   const isInFarcaster = useCallback(() => {
@@ -77,51 +46,47 @@ export function FrameProvider({ children }: FrameProviderProps) {
         setIsInMiniApp(isMiniApp);
         
         if (isMiniApp) {
+          console.log("Initializing Farcaster Mini App SDK...");
           
-          // Call ready() immediately to hide splash screen
+          // Get context
+          const sdkContext = await sdk.context;
+          setContext(sdkContext);
+          
+          // Extract user info from context
+          if (sdkContext?.user) {
+            setUser({
+              fid: sdkContext.user.fid,
+              username: sdkContext.user.username,
+              displayName: sdkContext.user.displayName,
+              pfpUrl: sdkContext.user.pfpUrl
+            });
+          }
+          
+          // Call ready() to hide splash screen - THIS IS CRITICAL
           try {
-            await enhancedSdk.actions.ready();
+            await sdk.actions.ready();
+            console.log("SDK ready() called successfully - splash screen should be hidden");
           } catch (readyError) {
             console.error("Failed to call ready():", readyError);
           }
           
-          // Get context and user info
-          const context = await enhancedSdk.context;
-          if (context) {
-            setContext(context as FrameContext);
-            setActions(enhancedSdk.actions);
-            setIsEthProviderAvailable(!!enhancedSdk.wallet?.ethProvider);
-            
-            // Extract user info from context
-            if (context.user) {
-              setUser({
-                fid: context.user.fid,
-                username: context.user.username,
-                displayName: context.user.displayName,
-                pfpUrl: context.user.pfpUrl
-              });
+          // Auto-add mini app on first load (if supported)
+          try {
+            const wasAdded = localStorage.getItem('monad-counter-miniapp-added');
+            if (!wasAdded) {
+              await sdk.actions.addMiniApp();
+              localStorage.setItem('monad-counter-miniapp-added', 'true');
+              console.log("Mini app automatically added");
             }
-            
-            // Auto-add mini app on first load (if supported)
-            try {
-              const wasAdded = localStorage.getItem('monad-counter-miniapp-added');
-              if (!wasAdded) {
-                await enhancedSdk.actions.addMiniApp();
-                localStorage.setItem('monad-counter-miniapp-added', 'true');
-                console.log("Mini app automatically added");
-              }
-            } catch (addError) {
-              console.log("Auto add mini app failed:", addError);
-              // This is expected in development or if user rejects
-            }
+          } catch (addError) {
+            console.log("Auto add mini app failed:", addError);
+            // This is expected in development or if user rejects
           }
         } else {
           console.log("Running in regular web environment");
-          setActions(null);
         }
       } catch (err) {
         console.error("SDK initialization error:", err);
-        setError(err instanceof Error ? err.message : "SDK initialization failed");
       } finally {
         setIsSDKLoaded(true);
       }
@@ -134,15 +99,12 @@ export function FrameProvider({ children }: FrameProviderProps) {
     <FrameProviderContext.Provider
       value={{
         context,
-        actions,
         isSDKLoaded,
-        isEthProviderAvailable,
-        error,
         isInMiniApp,
         user,
       }}
     >
-      <FrameWalletProvider>{children}</FrameWalletProvider>
+      {children}
     </FrameProviderContext.Provider>
   );
 } 

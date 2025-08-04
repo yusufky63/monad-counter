@@ -33,7 +33,7 @@ export default function RootLayout({
         <meta property="og:url" content="https://monad-counter.vercel.app/" />
         <meta name="twitter:card" content="summary_large_image" />
         {/* Farcaster Mini App Embed Meta */}
-        <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://monad-counter.vercel.app/images/feed.png","button":{"title":"Launch Counter","action":{"type":"launch_frame","name":"Monad Counter","url":"https://monad-counter.vercel.app","splashImageUrl":"https://monad-counter.vercel.app/images/splash.png","splashBackgroundColor":"#181028"}}}' />
+        <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://monad-counter.vercel.app/images/feed.png","button":{"title":"Launch Counter","action":{"type":"launch_miniapp","name":"Monad Counter","url":"https://monad-counter.vercel.app","splashImageUrl":"https://monad-counter.vercel.app/images/splash.png","splashBackgroundColor":"#181028"}}}' />
       </head>
       <body>
         <Providers>

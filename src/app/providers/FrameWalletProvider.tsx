@@ -22,7 +22,7 @@ export const config = createConfig({
     }),
   },
   connectors: [
-    farcasterFrame(), // Farcaster için
+    farcasterFrame(), // Farcaster için - her zaman ilk sırada
     injected(), // Tarayıcı cüzdanları için
     metaMask(), // MetaMask özel desteği
   ],

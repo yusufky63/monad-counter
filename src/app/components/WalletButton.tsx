@@ -74,7 +74,7 @@ export default function WalletButton() {
       try {
         setIsConnecting(true);
         if (isInWarpcast()) {
-          // In Warpcast, use farcaster connector
+          // In Warpcast, always use farcaster connector
           const farcasterConnector = connectors.find(
             (c) => c.id === "farcaster"
           );
@@ -119,7 +119,11 @@ export default function WalletButton() {
   useEffect(() => {
     if (isConnected && chainId !== monadTestnet.id) {
       try {
-        switchChain({ chainId: monadTestnet.id });
+        // Only try to switch chain if we're not using Farcaster connector
+        // Farcaster connector handles chain switching differently
+        if (!isInWarpcast()) {
+          switchChain({ chainId: monadTestnet.id });
+        }
       } catch (error) {
         console.log("Chain switch failed:", error);
       }
@@ -151,10 +155,12 @@ export default function WalletButton() {
 
     try {
       if (isInWarpcast()) {
-        // Find Farcaster connector
+        // In Warpcast, always use farcaster connector
         const farcasterConnector = connectors.find((c) => c.id === "farcaster");
         if (farcasterConnector) {
           await connect({ connector: farcasterConnector });
+        } else {
+          throw new Error("Farcaster connector not found");
         }
       } else {
         // Try injected connector first (MetaMask)
@@ -178,6 +184,17 @@ export default function WalletButton() {
       }
     } catch (error) {
       console.error("Connection error:", error);
+      
+      // Handle Farcaster specific errors
+      if (isInWarpcast() && error instanceof Error) {
+        if (error.message.includes("unauthorized") || error.message.includes("not been authorized")) {
+          console.log("Farcaster wallet authorization required");
+          // In Farcaster, this might be expected - user needs to authorize
+        } else if (error.message.includes("Farcaster connector not found")) {
+          console.error("Farcaster connector not available");
+        }
+      }
+      
       setIsConnecting(false);
     }
   };

@@ -18,6 +18,7 @@ import { getContractAddress } from "./utils/ContractAddresses";
 
 // Farcaster Mini App SDK 
 import { useCounter } from "./hooks/useCounter";
+import { sdk } from "@farcaster/miniapp-sdk";
 
 // Monad Testnet Chain ID
 const MONAD_CHAIN_ID = 10143;
@@ -33,15 +34,38 @@ import { parseEther } from 'viem/utils';
 export default function OnChainCounter() {
   const [isLoading, setIsLoading] = useState(true);
   
-  // Initialize loading state
+  // Initialize loading state and SDK
   useEffect(() => {
-    // Just set loading to false after a brief delay
-    // FrameProvider handles the SDK initialization and ready() call
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 500);
+    const initializeApp = async () => {
+      try {
+        // Check if we're in Farcaster environment
+        const isInFarcaster = typeof window !== 'undefined' && window.parent !== window;
+        
+        if (isInFarcaster) {
+          console.log("Initializing Farcaster Mini App...");
+          
+          // Call ready() to hide splash screen - THIS IS CRITICAL FOR MOBILE
+          try {
+            await sdk.actions.ready();
+            console.log("SDK ready() called successfully - splash screen should be hidden");
+          } catch (readyError) {
+            console.error("Failed to call ready():", readyError);
+          }
+        }
+        
+        // Set loading to false after a brief delay
+        const timer = setTimeout(() => {
+          setIsLoading(false);
+        }, 500);
+        
+        return () => clearTimeout(timer);
+      } catch (error) {
+        console.error("App initialization error:", error);
+        setIsLoading(false);
+      }
+    };
     
-    return () => clearTimeout(timer);
+    initializeApp();
   }, []);
   
   // Loading skeleton component for Farcaster loading
@@ -146,7 +170,7 @@ function WarpcastCounter() {
       toast.loading("Connecting wallet...", { id: "wallet-connect" });
       
       if (isInWarpcast()) {
-        // In Warpcast, use farcaster connector
+        // In Warpcast, always use farcaster connector
         await connect({ connector: farcasterFrame() });
       } else {
         // In browser, try MetaMask connector
@@ -306,7 +330,9 @@ function WarpcastCounter() {
   // Auto switch to Monad Testnet when connected but on wrong chain
   useEffect(() => {
     const autoSwitchChain = async () => {
-      if (isConnected && chainId !== MONAD_CHAIN_ID && switchChainAsync) {
+      // Only auto-switch in non-Farcaster environments
+      const isInFarcaster = typeof window !== 'undefined' && window.parent !== window;
+      if (isConnected && chainId !== MONAD_CHAIN_ID && switchChainAsync && !isInFarcaster) {
         try {
           console.log(`Auto-switching from chain ${chainId} to Monad Testnet (${MONAD_CHAIN_ID})`);
           await switchChainAsync({ chainId: MONAD_CHAIN_ID });
@@ -362,8 +388,27 @@ function WarpcastCounter() {
         duration: 10000
       });
       
-      // Switch network if needed - automatic switching for better UX
-      if (chainId !== MONAD_CHAIN_ID) {
+      // For Farcaster environment, ensure wallet is properly authorized
+      const isInFarcaster = typeof window !== 'undefined' && window.parent !== window;
+      if (isInFarcaster) {
+        // In Farcaster, we need to ensure the wallet is properly connected
+        // and the user has authorized the transaction
+        console.log("Farcaster environment detected, ensuring wallet authorization...");
+        
+        // Wait a bit for wallet state to be fully ready
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Check if wallet is still connected
+        if (!isConnected || !address) {
+          toast.dismiss("tx-loading");
+          setIsTransactionPending(false);
+          toast.error("Wallet connection lost. Please reconnect.", { duration: 3000 });
+          return;
+        }
+      }
+      
+      // Switch network if needed - but only for non-Farcaster environments
+      if (chainId !== MONAD_CHAIN_ID && !isInFarcaster) {
         try {
           console.log(`Auto-switching from chain ${chainId} to ${MONAD_CHAIN_ID}`);
           
@@ -400,18 +445,24 @@ function WarpcastCounter() {
         }
       }
       
+      // For Farcaster environment, just proceed with transaction
+      // Farcaster handles chain switching automatically
+      
       // Use fixed fee
       const feeValue = parseEther('0.005'); // 0.005 MON
       
-      // Send transaction with explicit chain ID and account validation
-      await mutation.writeContractAsync({
+      // For Farcaster environment, ensure we're using the correct account
+      const transactionConfig = {
         address: contractAddress,
         abi: counterABI,
         functionName: "incrementCounter",
         chainId: MONAD_CHAIN_ID,
         value: feeValue,
         account: address, // Explicitly specify the account
-      });
+      };
+      
+      // Send transaction
+      await mutation.writeContractAsync(transactionConfig);
       
       // Dismiss loading toast
       toast.dismiss("tx-loading");
@@ -443,9 +494,13 @@ function WarpcastCounter() {
         } else if (error.message.includes("chain")) {
           toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
         } else if (error.message.includes("unauthorized") || error.message.includes("not been authorized")) {
-          // Handle wallet switching issue
-          toast.error("Wallet state mismatch. Please refresh the page and try again.", { duration: 5000 });
+          // Handle Farcaster wallet authorization issue
+          toast.error("Wallet authorization required. Please reconnect your wallet.", { duration: 5000 });
           // Force wallet state refresh
+          refreshWalletState();
+        } else if (error.message.includes("getChainId")) {
+          // Handle Farcaster connector specific error
+          toast.error("Wallet connection issue. Please refresh and try again.", { duration: 5000 });
           refreshWalletState();
         } else {
           toast.error("Transaction failed", { duration: 3000 });
