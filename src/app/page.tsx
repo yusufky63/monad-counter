@@ -446,64 +446,64 @@ function WarpcastCounter() {
         }
       }
       
-      // For Farcaster environment, just proceed with transaction
-      // Farcaster handles chain switching automatically
-      
       // Use fixed fee
       const feeValue = parseEther('0.005'); // 0.005 MON
       
-      // For Farcaster environment, ensure we're using the correct account
-      const transactionConfig = {
-        address: contractAddress,
-        abi: counterABI,
-        functionName: "incrementCounter",
-        chainId: MONAD_CHAIN_ID,
-        value: feeValue,
-        account: address, // Explicitly specify the account
-      };
-      
-      // Check if we're using Farcaster connector and handle accordingly
+      // Handle Farcaster vs regular wallet transactions differently
       if (isInFarcaster) {
-        // For Farcaster, we need to handle the transaction differently
-        // because the connector doesn't have getChainId method
-        console.log("Farcaster environment detected, using special transaction handling");
+        // For Farcaster, use a custom approach that bypasses wagmi's chainId validation
+        console.log("Farcaster environment detected, using custom transaction approach");
         
-        // For Farcaster, use a simpler transaction approach
-        // that doesn't rely on getChainId
         try {
-          // Use a more direct approach for Farcaster
-          const result = await mutation.writeContractAsync({
+          // For Farcaster, try the simplest approach first - without chainId
+          console.log("Attempting Farcaster transaction without chainId specification");
+          await mutation.writeContractAsync({
             address: contractAddress,
             abi: counterABI,
             functionName: "incrementCounter",
             value: feeValue,
             account: address,
-            // Don't specify chainId for Farcaster to avoid getChainId issues
+            // Intentionally omit chainId to avoid getChainId issues
           });
           
-          console.log("Farcaster transaction sent successfully:", result);
+          console.log("Farcaster transaction sent successfully");
+          
         } catch (error) {
           console.error("Farcaster transaction error:", error);
           
-          // Check if it's a getChainId error
-          if (error instanceof Error && error.message.includes("getChainId")) {
-            console.log("Detected getChainId error, trying alternative approach");
+          // If the first approach fails, try without account specification
+          if (error instanceof Error && (error.message.includes("getChainId") || error.message.includes("connector"))) {
+            console.log("Detected connector issue, trying alternative approach");
             
-            // Try without account specification
-            await mutation.writeContractAsync({
-              address: contractAddress,
-              abi: counterABI,
-              functionName: "incrementCounter",
-              value: feeValue,
-              // Remove account specification for Farcaster
-            });
+            try {
+              await mutation.writeContractAsync({
+                address: contractAddress,
+                abi: counterABI,
+                functionName: "incrementCounter",
+                value: feeValue,
+                // Remove both chainId and account specification
+              });
+            } catch (fallbackError) {
+              console.error("Fallback transaction also failed:", fallbackError);
+              throw fallbackError;
+            }
           } else {
             throw error;
           }
         }
+        
       } else {
-        // For regular wallets, use normal transaction
-        await mutation.writeContractAsync(transactionConfig);
+        // For regular wallets, use normal transaction with full configuration
+        console.log("Regular wallet environment, using standard transaction");
+        
+        await mutation.writeContractAsync({
+          address: contractAddress,
+          abi: counterABI,
+          functionName: "incrementCounter",
+          chainId: MONAD_CHAIN_ID,
+          value: feeValue,
+          account: address,
+        });
       }
       
       // Dismiss loading toast
@@ -540,7 +540,7 @@ function WarpcastCounter() {
           toast.error("Wallet authorization required. Please reconnect your wallet.", { duration: 5000 });
           // Force wallet state refresh
           refreshWalletState();
-        } else if (error.message.includes("getChainId")) {
+        } else if (error.message.includes("getChainId") || error.message.includes("connector")) {
           // Handle Farcaster connector specific error
           toast.error("Wallet connection issue. Please refresh and try again.", { duration: 5000 });
           refreshWalletState();
