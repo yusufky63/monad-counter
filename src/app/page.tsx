@@ -346,6 +346,14 @@ function WarpcastCounter() {
           // Don't show error toast for automatic switching, just log it
         }
       }
+      
+      // For Farcaster environment, check chain and provide guidance
+      if (isInFarcaster && isConnected && chainId !== MONAD_CHAIN_ID) {
+        console.log("Farcaster environment detected with wrong chain");
+        console.log("Current chain:", chainId);
+        console.log("Expected chain:", MONAD_CHAIN_ID);
+        console.log("User needs to manually switch to Monad Testnet");
+      }
     };
 
     // Add a small delay to ensure wallet is fully connected
@@ -459,41 +467,41 @@ function WarpcastCounter() {
         console.log("Wallet client available:", !!walletClient);
         console.log("Contract address:", contractAddress);
         console.log("Account address:", address);
+        console.log("Current chain ID:", chainId);
+        console.log("Expected chain ID:", MONAD_CHAIN_ID);
+        
+        // Check if we're on the correct chain for Farcaster
+        if (chainId !== MONAD_CHAIN_ID) {
+          console.log("Chain mismatch detected in Farcaster environment");
+          toast.dismiss("tx-loading");
+          setIsTransactionPending(false);
+          toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
+          return;
+        }
         
         try {
-          // For Farcaster, try the simplest approach first - without chainId
-          console.log("Attempting Farcaster transaction without chainId specification");
+          // For Farcaster, try to use the most minimal approach possible
+          console.log("Attempting minimal Farcaster transaction");
+          
+          // Use a minimal transaction approach that should avoid getChainId
           const result = await mutation.writeContractAsync({
             address: contractAddress,
             abi: counterABI,
             functionName: "incrementCounter",
             value: feeValue,
-            account: address,
-            // Intentionally omit chainId to avoid getChainId issues
+            // Completely omit all chain-related parameters
           });
           
-          console.log("Farcaster transaction sent successfully:", result);
+          console.log("Farcaster transaction successful:", result);
           
         } catch (error) {
           console.error("Farcaster transaction error:", error);
           
-          // If the first approach fails, try without account specification
-          if (error instanceof Error && (error.message.includes("getChainId") || error.message.includes("connector"))) {
-            console.log("Detected connector issue, trying alternative approach without account");
-            
-            try {
-              const fallbackResult = await mutation.writeContractAsync({
-                address: contractAddress,
-                abi: counterABI,
-                functionName: "incrementCounter",
-                value: feeValue,
-                // Remove both chainId and account specification
-              });
-              console.log("Fallback Farcaster transaction successful:", fallbackResult);
-            } catch (fallbackError) {
-              console.error("Fallback transaction also failed:", fallbackError);
-              throw fallbackError;
-            }
+          // If the first approach fails, show a specific error for Farcaster
+          if (error instanceof Error && error.message.includes("getChainId")) {
+            toast.error("Farcaster wallet issue. Please try refreshing the page.", { duration: 5000 });
+          } else if (error instanceof Error && error.message.includes("ChainMismatch")) {
+            toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
           } else {
             throw error;
           }
@@ -552,6 +560,9 @@ function WarpcastCounter() {
           // Handle Farcaster connector specific error
           toast.error("Wallet connection issue. Please refresh and try again.", { duration: 5000 });
           refreshWalletState();
+        } else if (error.message.includes("ChainMismatch")) {
+          // Handle chain mismatch error specifically
+          toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
         } else {
           toast.error("Transaction failed", { duration: 3000 });
         }
@@ -637,6 +648,21 @@ function WarpcastCounter() {
             <div className="absolute inset-0 opacity-50 z-[-1]" />
 
             <div className="relative text-center">
+              {/* Chain Status Indicator */}
+              {isConnected && chainId !== MONAD_CHAIN_ID && (
+                <div className="mb-4 p-3 bg-orange-100 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 rounded-lg">
+                  <div className="text-orange-800 dark:text-orange-200 text-sm font-medium">
+                    ⚠️ Wrong Network
+                  </div>
+                  <div className="text-orange-600 dark:text-orange-300 text-xs mt-1">
+                    {isInWarpcast() 
+                      ? "Please switch to Monad Testnet in your wallet"
+                      : "Switching to Monad Testnet..."
+                    }
+                  </div>
+                </div>
+              )}
+              
               {/* Counter Value */}
               <div className="py-4">
                 <div 
