@@ -148,18 +148,21 @@ function WarpcastCounter() {
   const chainId = useChainId();
   const { switchChain: switchChainAsync } = useSwitchChain();
   
+  // Function to determine if in Warpcast environment
+  const isInWarpcast = useCallback(() => {
+    return typeof window !== 'undefined' && window.parent !== window;
+  }, []);
+  
   // Debug chain information
   useEffect(() => {
     console.log("Current chain ID:", chainId);
     console.log("Target chain ID:", MONAD_CHAIN_ID);
     console.log("Wallet client available:", !!walletClient);
     console.log("Contract address:", contractAddress);
-  }, [chainId, walletClient, contractAddress]);
-  
-  // Function to determine if in Warpcast environment
-  const isInWarpcast = useCallback(() => {
-    return typeof window !== 'undefined' && window.parent !== window;
-  }, []);
+    console.log("Is connected:", isConnected);
+    console.log("Address:", address);
+    console.log("Is in Farcaster:", isInWarpcast());
+  }, [chainId, walletClient, contractAddress, isConnected, address, isInWarpcast]);
   
   // Auto-connect wallet function with improved state management
   const autoConnectWallet = useCallback(async () => {
@@ -453,11 +456,14 @@ function WarpcastCounter() {
       if (isInFarcaster) {
         // For Farcaster, use a custom approach that bypasses wagmi's chainId validation
         console.log("Farcaster environment detected, using custom transaction approach");
+        console.log("Wallet client available:", !!walletClient);
+        console.log("Contract address:", contractAddress);
+        console.log("Account address:", address);
         
         try {
           // For Farcaster, try the simplest approach first - without chainId
           console.log("Attempting Farcaster transaction without chainId specification");
-          await mutation.writeContractAsync({
+          const result = await mutation.writeContractAsync({
             address: contractAddress,
             abi: counterABI,
             functionName: "incrementCounter",
@@ -466,23 +472,24 @@ function WarpcastCounter() {
             // Intentionally omit chainId to avoid getChainId issues
           });
           
-          console.log("Farcaster transaction sent successfully");
+          console.log("Farcaster transaction sent successfully:", result);
           
         } catch (error) {
           console.error("Farcaster transaction error:", error);
           
           // If the first approach fails, try without account specification
           if (error instanceof Error && (error.message.includes("getChainId") || error.message.includes("connector"))) {
-            console.log("Detected connector issue, trying alternative approach");
+            console.log("Detected connector issue, trying alternative approach without account");
             
             try {
-              await mutation.writeContractAsync({
+              const fallbackResult = await mutation.writeContractAsync({
                 address: contractAddress,
                 abi: counterABI,
                 functionName: "incrementCounter",
                 value: feeValue,
                 // Remove both chainId and account specification
               });
+              console.log("Fallback Farcaster transaction successful:", fallbackResult);
             } catch (fallbackError) {
               console.error("Fallback transaction also failed:", fallbackError);
               throw fallbackError;
@@ -495,6 +502,7 @@ function WarpcastCounter() {
       } else {
         // For regular wallets, use normal transaction with full configuration
         console.log("Regular wallet environment, using standard transaction");
+        console.log("Wallet client available:", !!walletClient);
         
         await mutation.writeContractAsync({
           address: contractAddress,
@@ -559,8 +567,14 @@ function WarpcastCounter() {
     if (isConnected && address) {
       console.log("Wallet connected:", address);
       console.log("Current chain ID:", chainId);
+      console.log("Wallet client status:", walletClient ? "Available" : "Not available");
+      
+      // In Farcaster environment, wallet client might not be available initially
+      if (isInWarpcast() && !walletClient) {
+        console.log("Farcaster environment detected - wallet client not available (this is normal)");
+      }
     }
-  }, [isConnected, address, chainId, walletStateVersion]);
+  }, [isConnected, address, chainId, walletStateVersion, walletClient, isInWarpcast]);
   
   return (
     <FarcasterWrapper>
