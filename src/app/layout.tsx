@@ -29,11 +29,13 @@ export default function RootLayout({
         {/* OpenGraph & Twitter Meta Tags */}
         <meta property="og:title" content="Monad Counter" />
         <meta property="og:description" content="On-chain counter mini-app for Monad and Farcaster." />
-        <meta property="og:image" content="https://monad-counter.vercel.app/images/feed.png" />
-        <meta property="og:url" content="https://monad-counter.vercel.app/" />
+        <meta property="og:image" content="http://localhost:3000/images/feed.png" />
+        <meta property="og:url" content="http://localhost:3000/" />
         <meta name="twitter:card" content="summary_large_image" />
-        {/* Farcaster Mini App Embed Meta */}
-        <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://monad-counter.vercel.app/images/feed.png","button":{"title":"Launch Counter","action":{"type":"launch_miniapp","name":"Monad Counter","url":"https://monad-counter.vercel.app","splashImageUrl":"https://monad-counter.vercel.app/images/splash.png","splashBackgroundColor":"#181028"}}}' />
+        {/* Farcaster Mini App Embed Meta - localhost için */}
+        <meta name="fc:miniapp" content='{"version":"1","imageUrl":"http://localhost:3000/images/feed.png","button":{"title":"Launch Counter","action":{"type":"launch_miniapp","name":"Monad Counter","url":"http://localhost:3000","splashImageUrl":"http://localhost:3000/images/splash.png","splashBackgroundColor":"#181028"}}}' />
+        {/* Backward compatibility */}
+        <meta name="fc:frame" content='{"version":"1","imageUrl":"http://localhost:3000/images/feed.png","button":{"title":"Launch Counter","action":{"type":"launch_frame","name":"Monad Counter","url":"http://localhost:3000","splashImageUrl":"http://localhost:3000/images/splash.png","splashBackgroundColor":"#181028"}}}' />
       </head>
       <body>
         <Providers>

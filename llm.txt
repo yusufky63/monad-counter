@@ -1351,6 +1351,7 @@ Currently, you need to use tunneling tools like ngrok to expose your local serve
 1. **Node.js version**: Use Node.js 22.11.0 or higher
 2. **Tunneling**: Use ngrok or similar tools to create HTTPS URLs
 3. **HTTPS required**: Farcaster requires HTTPS for Mini Apps
+4. **Test your app**: Use the [Mini App Preview Tool](https://farcaster.xyz/~/developers/mini-apps/preview) to test the app at your tunneled URL
 
 ### My manifest isn't validating. What's wrong?
 
@@ -3290,6 +3291,13 @@ function NavigationExample() {
 
 ## What's New
 
+### December 19, 2024
+
+* Added experimental [`signManifest`](/docs/sdk/actions/sign-manifest) action for domain manifest verification:
+  * Signs domain manifests for authenticity verification
+  * Returns structured response with header, payload, and signature
+  * Available under `sdk.experimental.signManifest()`
+
 ### July 25, 2025
 
 * Added support for EIP-5792 batch transactions in Farcaster Wallet:
@@ -3373,15 +3381,10 @@ This guide tracks known incompatibilities as we work towards that goal.
 
 ### Base App
 
-Below is a list of the main incompatibilities Base App is actively working on fixing. For more information on how mini apps work in Base App, please refer to [these docs](https://docs.base.org/base-app/introduction/mini-apps).
+Below is a list of the main incompatibilities Base App is actively working on fixing. For more information on how mini apps work in Base App, please refer to [these docs](https://docs.base.org/mini-apps).
 
-* `sdk.actions.composeCast()` bug fixes for return data (ETA 8/6)
-* `sdk.isInMiniApp()` (ETA 8/6)
-* `sdk.actions.swapToken()` (ETA 8/6)
-* `sdk.actions.addMiniApp()` (ETA 8/13)
-* `sdk.back` methods (ETA 8/13)
-* `sdk.haptics` methods (ETA 8/13)
-* `sdk.actions.requestCameraAndMicrophoneAccess()` (ETA 8/13)
+* `sdk.actions.addMiniApp` (ETA early October, more info soon!)
+* `sdk.experimental.signManifest` (ETA early October, more info soon!)
 
 
 ## Context
@@ -4790,6 +4793,136 @@ try {
 ```
 
 [If you're an AI agent or LLM, please read this.](/docs/guides/agents-checklist)
+
+
+import { Caption } from '../../../../components/Caption.tsx';
+
+## signManifest (Experimental)
+
+:::warning
+This is an experimental feature and may change or be removed in future versions.
+:::
+
+\:::warning Host Discretion
+The availability and behavior of `signManifest` depends entirely on the host implementation. Hosts may choose to:
+
+* Enable manifest signing for all domains
+* Restrict signing to specific allowlisted domains
+* Disable the feature entirely
+* Implement additional validation requirements
+
+Check with your specific host's documentation for their manifest signing policies.
+\:::
+
+Signs a domain manifest for verification and authenticity purposes.
+
+### Usage
+
+```ts twoslash
+import { sdk } from '@farcaster/miniapp-sdk'
+
+const result = await sdk.experimental.signManifest({
+  domain: 'example.com'
+})
+```
+
+### Parameters
+
+#### `options`
+
+* **domain** (required): The domain to sign the manifest for
+
+### Return Value
+
+Returns an object with the following properties:
+
+* **header**: The header component of the signed manifest
+* **payload**: The payload component containing the domain data
+* **signature**: The cryptographic signature
+
+```ts
+{
+  header: string
+  payload: string
+  signature: string
+}
+```
+
+### Errors
+
+#### `RejectedByUser`
+
+Thrown if a user rejects the request to sign the manifest.
+
+```ts
+try {
+  await sdk.experimental.signManifest({ domain: 'example.com' })
+} catch (error) {
+  if (error instanceof SignManifest.RejectedByUser) {
+    // Handle user rejection
+  }
+}
+```
+
+#### `InvalidDomain`
+
+Thrown when the provided domain is invalid or malformed.
+
+```ts
+try {
+  await sdk.experimental.signManifest({ domain: 'invalid-domain' })
+} catch (error) {
+  if (error instanceof SignManifest.InvalidDomain) {
+    // Handle invalid domain
+  }
+}
+```
+
+#### `GenericError`
+
+Thrown when manifest signing fails for various reasons including host restrictions, network issues, or other implementation-specific failures.
+
+```ts
+try {
+  await sdk.experimental.signManifest({ domain: 'example.com' })
+} catch (error) {
+  if (error instanceof SignManifest.GenericError) {
+    // Handle generic signing failures
+    console.log('Signing failed:', error.message)
+  }
+}
+```
+
+#### Generic Error Handling
+
+For robust error handling, you should catch all specific error types:
+
+```ts
+try {
+  const result = await sdk.experimental.signManifest({ domain: 'example.com' })
+  // Handle successful signing
+} catch (error) {
+  if (error instanceof SignManifest.RejectedByUser) {
+    // User declined to sign the manifest
+    console.log('User rejected manifest signing')
+  } else if (error instanceof SignManifest.InvalidDomain) {
+    // Domain format is invalid
+    console.log('Invalid domain format')
+  } else if (error instanceof SignManifest.GenericError) {
+    // Generic signing failures
+    console.log('Signing failed:', error.message)
+    // This could include:
+    // - Domain not allowlisted by host
+    // - Feature disabled by host
+    // - Network or connectivity issues
+    // - Host-specific validation failures
+  } else {
+    // Other unexpected errors
+    console.log('Manifest signing failed:', error.message)
+    // This could include network or authentication errors
+  }
+}
+```
 
 
 ## swapToken

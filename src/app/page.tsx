@@ -2,307 +2,324 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ThemeContext } from "./context/ThemeContext";
 import { toast } from "react-hot-toast";
-import { BigNumber } from "ethers";
-import { ethers } from "ethers";
+import { useAccount, useConnect, useWriteContract, useChainId, useSwitchChain } from "wagmi";
+import { parseEther } from 'viem/utils';
 
-// Components
+// Components - dokümana göre
+import { useFrame } from "./providers/FrameProvider";
 import LeaderboardModal from "./components/LeaderboardModal";
-import AccountModal from "./common/AccountModal";
 import HowItWorksModal from "./components/HowItWorksModal";
-import { FarcasterWrapper } from "./components/FarcasterWrapper";
 import WalletButton from "./components/WalletButton";
-import { FarcasterShareFooter } from "./components/FarcasterActions";
 
-// Utils
+// Utils and contract
 import { getContractAddress } from "./utils/ContractAddresses";
-
-// Farcaster Mini App SDK 
+import counterABI from "./contract/ABI";
 import { useCounter } from "./hooks/useCounter";
-import { sdk } from "@farcaster/miniapp-sdk";
 
 // Monad Testnet Chain ID
 const MONAD_CHAIN_ID = 10143;
 
-// Import counter ABI
-import counterABI from "./contract/ABI";
-import { useWriteContract, useChainId, useWalletClient, useAccount, useConnect, useSwitchChain } from "wagmi";
-import { metaMask } from "wagmi/connectors";
-import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
-import { parseEther } from 'viem/utils';
+// Contract leaderboard data interface
+interface ContractLeaderboardItem {
+  userAddress: string;
+  contributions: number;
+  lastUpdate: number;
+}
 
-// Main component - only works in Warpcast environment
-export default function OnChainCounter() {
-  const [isLoading, setIsLoading] = useState(true);
-  
-  // Initialize loading state and SDK
+// Leaderboard UI data interface
+interface LeaderboardUIItem {
+  address: string;
+  userAddress: string;
+  contributions: number;
+  contribution: number;
+  rank: number;
+  username: string;
+  isCurrentUser: boolean;
+}
+
+export default function MonadCounterApp() {
+  const { isSDKLoaded, isInMiniApp } = useFrame();
+  const [isAppReady, setIsAppReady] = useState(false);
+
+  // SDK yüklendikten sonra uygulama içeriğini hazırla
   useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        // Check if we're in Farcaster environment
-        const isInFarcaster = typeof window !== 'undefined' && window.parent !== window;
-        
-        if (isInFarcaster) {
-          console.log("Initializing Farcaster Mini App...");
-          
-          // Call ready() to hide splash screen - THIS IS CRITICAL FOR MOBILE
-          try {
-            await sdk.actions.ready();
-            console.log("SDK ready() called successfully - splash screen should be hidden");
-          } catch (readyError) {
-            console.error("Failed to call ready():", readyError);
-          }
-        }
-        
-        // Set loading to false after a brief delay
-        const timer = setTimeout(() => {
-          setIsLoading(false);
-        }, 500);
-        
-        return () => clearTimeout(timer);
-      } catch (error) {
-        console.error("App initialization error:", error);
-        setIsLoading(false);
-      }
-    };
-    
-    initializeApp();
-  }, []);
-  
-  // Loading skeleton component for Farcaster loading
-  if (isLoading) {
+    if (isSDKLoaded) {
+      // İlk önce uygulama içeriğini göster, ready() çağrısını CounterApp'e bırak
+      setIsAppReady(true);
+    }
+  }, [isSDKLoaded]);
+
+  // Loading state - dokümana göre
+  if (!isAppReady) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white dark:bg-black">
         <div className="w-full max-w-md p-6 animate-pulse">
           {/* Header skeleton */}
-          <div className="h-8 bg-gray-300 dark:bg-gray-700 rounded mb-8"></div>
+          <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-8"></div>
           
           {/* Counter display skeleton */}
           <div className="relative py-8 px-4 rounded-2xl">
-            <div className="h-48 bg-gray-300 dark:bg-gray-700 rounded-xl"></div>
-            <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-600/10 blur-xl"></div>
+            <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
           </div>
 
           {/* Action buttons skeleton */}
           <div className="flex justify-center space-x-4 mt-8">
-            <div className="h-10 w-10 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
-            <div className="h-10 w-10 bg-gray-300 dark:bg-gray-700 rounded-full"></div>
+            <div className="h-10 w-24 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+            <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
           </div>
+        </div>
+        <div className="text-center mt-4 text-gray-600 dark:text-gray-400 text-sm">
+          {isInMiniApp ? "Initializing Mini App..." : "Loading Monad Counter..."}
         </div>
       </div>
     );
   }
   
-  // Render the Warpcast counter component
-  return <WarpcastCounter />;
+  // Render main app
+  return <CounterApp />;
 }
 
-// Component for Warpcast environment
-function WarpcastCounter() {
+// Ana Counter bileşeni
+function CounterApp() {
   const { theme } = React.useContext(ThemeContext);
+  const { isInMiniApp, context, haptics, composeCast, callReady } = useFrame();
   const { address, isConnected } = useAccount();
-  const { connect } = useConnect();
-  
-  // Use counter hook for user stats and leaderboard data
+  const { connect, connectors } = useConnect();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const { 
+    writeContract, 
+    data: hash, 
+    error: writeError
+  } = useWriteContract();
+
+  // Counter hook
   const {
     userStats,
     userRank,
     contributionTarget,
     rankDetails,
-
+    leaderboard: hookLeaderboard,
+    refreshData
   } = useCounter({
     chainId: MONAD_CHAIN_ID,
     address,
     isConnected
   });
   
-  // State for wallet and counter
-  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
-  const [displayedCounter, setDisplayedCounter] = useState("0");
+  // State
+  const [counter, setCounter] = useState("0");
+  const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
-  const [fee, setFee] = useState<BigNumber | null>(null);
   const [isTransactionPending, setIsTransactionPending] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [userInteractions, setUserInteractions] = useState(0);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardUIItem[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
   
-  // Get contract address - memoized to prevent unnecessary recalculations
+  // Transaction timeout ref
+  const transactionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  
+  // Processed hash ref - loop'u önlemek için
+  const processedHashRef = React.useRef<string | null>(null);
+
+  // Contract address
   const contractAddress = React.useMemo(() => {
     try {
       return getContractAddress("Counter", MONAD_CHAIN_ID);
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Contract address not found", {
-        style: {
-          background: "#1e293b",
-          color: "#ef4444",
-          border: "1px solid rgba(239,68,68,0.2)",
-        },
-      });
+    } catch {
+      toast.error("Contract address not found");
       return null;
     }
-  }, []); // Empty dependency array since MONAD_CHAIN_ID is constant
-  
-  // wagmi hooks
-  const mutation = useWriteContract();
-  const { data: walletClient } = useWalletClient();
-  const chainId = useChainId();
-  const { switchChain: switchChainAsync } = useSwitchChain();
-  
-  // Function to determine if in Warpcast environment
-  const isInWarpcast = useCallback(() => {
-    return typeof window !== 'undefined' && window.parent !== window;
   }, []);
   
-  // Debug chain information
-  useEffect(() => {
-    console.log("Current chain ID:", chainId);
-    console.log("Target chain ID:", MONAD_CHAIN_ID);
-    console.log("Wallet client available:", !!walletClient);
-    console.log("Contract address:", contractAddress);
-    console.log("Is connected:", isConnected);
-    console.log("Address:", address);
-    console.log("Is in Farcaster:", isInWarpcast());
-  }, [chainId, walletClient, contractAddress, isConnected, address, isInWarpcast]);
-  
-  // Auto-connect wallet function with improved state management
-  const autoConnectWallet = useCallback(async () => {
-    if (isConnected || isConnecting) return;
-    
+  // Wallet connection - dokümana göre - SADECE MONAD AĞI
+  const handleWalletConnect = async () => {
     try {
-      setIsConnecting(true);
-      toast.loading("Connecting wallet...", { id: "wallet-connect" });
-      
-      if (isInWarpcast()) {
-        // In Warpcast, always use farcaster connector
-        await connect({ connector: farcasterFrame() });
-      } else {
-        // In browser, try MetaMask connector
-        await connect({ connector: metaMask() });
+      // Haptic feedback
+      try {
+        await haptics.selection();
+      } catch (error) {
+        console.log("Haptic selection failed:", error);
       }
       
-      toast.dismiss("wallet-connect");
-      toast.success("Wallet connected!");
-    } catch (error) {
-      console.error("Connection error:", error);
-      toast.dismiss("wallet-connect");
-      toast.error("Failed to connect wallet");
-    } finally {
-      setIsConnecting(false);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isConnected, isInWarpcast, connect]); // Removed isConnecting to prevent loops
-
-  // Add wallet state synchronization
-  const [walletStateVersion, setWalletStateVersion] = useState(0);
-
-  // Force wallet state refresh when switching wallets
-  const refreshWalletState = useCallback(() => {
-    setWalletStateVersion(prev => prev + 1);
-    // Force a small delay to ensure wallet state is updated
-    setTimeout(() => {
-      // This will trigger re-renders and re-evaluation of wallet state
-    }, 100);
-  }, []);
-  
-  // Direct leaderboard fetch with proper error handling
-  const [directLeaderboard, setDirectLeaderboard] = useState([]);
-  const [directLeaderboardLoading, setDirectLeaderboardLoading] = useState(true);
-
-  // Fetch leaderboard directly - memoized to prevent unnecessary re-renders
-  const fetchLeaderboardDirect = useCallback(async () => {
-    if (!contractAddress) return;
-    setDirectLeaderboardLoading(true);
-    
-    try {
-      // Create a minimal ethers provider
-      const provider = new ethers.providers.JsonRpcProvider("https://testnet-rpc.monad.xyz");
-      const contract = new ethers.Contract(contractAddress, counterABI, provider);
-      
-      // Get leaderboard size
-      const leaderboardSize = await contract.leaderboardSize();
-      
-      // If size is 0, return empty array
-      if (leaderboardSize.eq(0)) {
-        setDirectLeaderboard([]);
-        setDirectLeaderboardLoading(false);
+      if (isConnected) {
+        // Zaten bağlı ama ağı kontrol et
+        if (chainId !== MONAD_CHAIN_ID) {
+          await handleNetworkSwitch();
+        }
         return;
       }
       
-      // Get all users
-      try {
-        // Note: using toString() to handle BigNumber conversion
-        const sizeNumber = parseInt(leaderboardSize.toString());
-        
-        const users = await contract.getTopUsers(sizeNumber);
-        
-        // Format for component
-        const formatted = users.map((entry: { user: string; score: { toString(): string }; lastUpdate: { toString(): string } }) => ({
-          userAddress: entry.user,
-          contributions: parseInt(entry.score.toString()),
-          lastUpdate: parseInt(entry.lastUpdate.toString())
-        }));
-        
-        setDirectLeaderboard(formatted);
-      } catch (err) {
-        console.error("Error getting top users:", err);
-        setDirectLeaderboard([]);
+      // Farcaster Mini App connector'ını kullan
+      const farcasterConnector = connectors.find(connector => 
+        connector.name === 'farcasterMiniApp' || connector.id === 'farcaster'
+      );
+      
+      if (farcasterConnector) {
+        await connect({ connector: farcasterConnector });
+      } else {
+        // Fallback
+        await connect({ connector: connectors[0] });
       }
-    } catch (err) {
-      console.error("Direct leaderboard fetch error:", err);
-      setDirectLeaderboard([]);
-    } finally {
-      setDirectLeaderboardLoading(false);
+      
+      try {
+        await haptics.notification('success');
+      } catch (error) {
+        console.log("Haptic notification failed:", error);
+      }
+      toast.success("Wallet connected!");
+      
+      // Bağlandıktan sonra hemen Monad ağına switch et
+      setTimeout(() => {
+        if (chainId !== MONAD_CHAIN_ID) {
+          handleNetworkSwitch();
+        }
+      }, 1000);
+      
+    } catch (error) {
+      console.error("Wallet connection failed:", error);
+      try {
+        await haptics.notification('error');
+      } catch (hapticError) {
+        console.log("Haptic error failed:", hapticError);
+      }
+      toast.error("Failed to connect wallet");
     }
-  }, [contractAddress]);
-  
-  // Fetch direct leaderboard on load
-  useEffect(() => {
-    fetchLeaderboardDirect();
+  };
+
+  // Network switch - SADECE MONAD'A İZİN VER
+  const handleNetworkSwitch = async () => {
+    try {
+      toast.loading("Switching to Monad Testnet...", { id: "network-switch" });
+      await switchChain({ chainId: MONAD_CHAIN_ID });
+      toast.dismiss("network-switch");
+      toast.success("Switched to Monad Testnet!");
+      try {
+        await haptics.notification('success');
+      } catch (error) {
+        console.log("Haptic notification failed:", error);
+      }
+    } catch (error) {
+      toast.dismiss("network-switch");
+      console.error("Network switch failed:", error);
+      toast.error("Please manually switch to Monad Testnet");
+      try {
+        await haptics.notification('error');
+      } catch (hapticError) {
+        console.log("Haptic error failed:", hapticError);
+      }
+    }
+  };
+
+  // Counter artırma - dokümana göre
+  const handleIncrement = async () => {
+    if (!contractAddress || isTransactionPending) return;
     
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchLeaderboardDirect, 30000);
-    return () => clearInterval(interval);
-  }, [fetchLeaderboardDirect]);
-  
-  // Fetch contract data - memoized to prevent unnecessary re-renders
-  const fetchContractData = useCallback(async () => {
+    try {
+      // Haptic feedback
+      try {
+        await haptics.impact('medium');
+      } catch (error) {
+        console.log("Haptic impact failed:", error);
+      }
+      
+      // Wallet bağlantısını kontrol et
+      if (!isConnected) {
+        await handleWalletConnect();
+        return;
+      }
+      
+      // Chain kontrolü - SADECE MONAD KABUL ET
+      if (chainId !== MONAD_CHAIN_ID) {
+        await handleNetworkSwitch();
+        return; // Network switch'ten sonra tekrar denesin
+      }
+
+      setIsTransactionPending(true);
+      toast.loading("Sending transaction...", { id: "tx-loading" });
+      
+      // Yeni transaction başladı - previous hash'i temizle
+      processedHashRef.current = null;
+
+      // Çok kısa timeout - 5 saniye sonra loading'i kapat (cancel durumu için)
+      transactionTimeoutRef.current = setTimeout(() => {
+        console.warn("Transaction likely cancelled - auto clearing");
+        toast.dismiss("tx-loading");
+        setIsTransactionPending(false);
+      }, 5000); // 5 saniye çok agresif
+
+      try {
+        // Transaction gönder
+        writeContract({
+          address: contractAddress,
+          abi: counterABI,
+          functionName: "incrementCounter",
+          value: parseEther('0.005'), // 0.005 MON fee
+        });
+      } catch (writeError: unknown) {
+        // writeContract'tan gelen immediate hata
+        if (transactionTimeoutRef.current) {
+          clearTimeout(transactionTimeoutRef.current);
+          transactionTimeoutRef.current = null;
+        }
+        
+        console.error("WriteContract immediate error:", writeError);
+        
+        // Immediate cancel detection
+        const errorMessage = (writeError as Error & { message?: string })?.message?.toLowerCase() || '';
+        const errorCode = (writeError as Error & { code?: number | string })?.code;
+        const isCancelledImmediate = errorMessage.includes("user rejected") || 
+                                   errorMessage.includes("cancelled") ||
+                                   errorCode === 4001;
+        
+        toast.dismiss("tx-loading");
+        
+        if (isCancelledImmediate) {
+          console.log("🚫 Transaction cancelled immediately");
+          try {
+            await haptics.notification('warning');
+          } catch (error) {
+            console.log("Haptic warning failed:", error);
+          }
+        } else {
+          toast.error("Failed to send transaction", { duration: 3000 });
+          try {
+            await haptics.notification('error');
+          } catch (error) {
+            console.log("Haptic error failed:", error);
+          }
+        }
+        setIsTransactionPending(false);
+      }
+      
+    } catch (error: unknown) {
+      if (transactionTimeoutRef.current) {
+        clearTimeout(transactionTimeoutRef.current);
+        transactionTimeoutRef.current = null;
+      }
+      console.error("Setup error:", error);
+      toast.dismiss("tx-loading");
+      toast.error("Transaction setup failed");
+      try {
+        await haptics.notification('error');
+      } catch (hapticError) {
+        console.log("Haptic error failed:", hapticError);
+      }
+      setIsTransactionPending(false);
+    }
+  };
+
+  // Counter değerini getir
+  const fetchCounter = useCallback(async () => {
     if (!contractAddress) return;
     
     try {
-      // Simple JSON-RPC calls for contract reads
       const response = await fetch("https://testnet-rpc.monad.xyz", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: 1,
-          method: "eth_call",
-          params: [
-            {
-              to: contractAddress,
-              data: "0xddca3f43" // fee() function signature
-            },
-            "latest"
-          ]
-        })
-      });
-      
-      const data = await response.json();
-      if (data.result) {
-        setFee(BigNumber.from(data.result));
-      }
-      
-      // Get counter value
-      const counterResponse = await fetch("https://testnet-rpc.monad.xyz", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 2,
           method: "eth_call",
           params: [
             {
@@ -314,410 +331,329 @@ function WarpcastCounter() {
         })
       });
       
-      const counterData = await counterResponse.json();
-      if (counterData.result) {
-        setDisplayedCounter(BigNumber.from(counterData.result).toString());
+      const data = await response.json();
+      if (data.result) {
+        const value = parseInt(data.result, 16).toString();
+        setCounter(value);
       }
     } catch (error) {
-      console.error("Failed to fetch contract data:", error);
+      console.error("Failed to fetch counter:", error);
     }
   }, [contractAddress]);
   
-  // Fetch contract data periodically
-  useEffect(() => {
-    fetchContractData();
-    
-    const interval = setInterval(fetchContractData, 15000);
-    return () => clearInterval(interval);
-  }, []); // Removed fetchContractData from dependencies to prevent loops
-
-  // Auto switch to Monad Testnet when connected but on wrong chain
-  useEffect(() => {
-    const autoSwitchChain = async () => {
-      // Only auto-switch in non-Farcaster environments
-      const isInFarcaster = typeof window !== 'undefined' && window.parent !== window;
-      if (isConnected && chainId !== MONAD_CHAIN_ID && switchChainAsync && !isInFarcaster) {
-        try {
-          console.log(`Auto-switching from chain ${chainId} to Monad Testnet (${MONAD_CHAIN_ID})`);
-          await switchChainAsync({ chainId: MONAD_CHAIN_ID });
-          console.log("Auto-switched to Monad Testnet successfully");
-        } catch (error) {
-          console.log("Auto chain switch failed (user might have rejected):", error);
-          // Don't show error toast for automatic switching, just log it
-        }
-      }
-      
-      // For Farcaster environment, check chain and provide guidance
-      if (isInFarcaster && isConnected && chainId !== MONAD_CHAIN_ID) {
-        console.log("Farcaster environment detected with wrong chain");
-        console.log("Current chain:", chainId);
-        console.log("Expected chain:", MONAD_CHAIN_ID);
-        console.log("User needs to manually switch to Monad Testnet");
-      }
-    };
-
-    // Add a small delay to ensure wallet is fully connected
-    const timer = setTimeout(() => {
-      autoSwitchChain();
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [isConnected, chainId, switchChainAsync]);
-  
-  // Enhanced handleIncrement with wallet state validation
-  const handleIncrement = useCallback(async () => {
-    if (!contractAddress || isTransactionPending) {
-      if (isTransactionPending) {
-        toast.error("Transaction in progress, please wait", {
-          id: "tx-already-pending",
-          duration: 3000
-        });
-      }
-      return;
-    }
-    
+  // Leaderboard yükle - gerçek contract verilerini kullan
+  const fetchLeaderboard = useCallback(async () => {
+    setLeaderboardLoading(true);
     try {
-      // Validate wallet state before proceeding
-      if (!isConnected || !address) {
-        console.log("Wallet not properly connected, attempting to reconnect...");
-        await autoConnectWallet();
-        // Wait a bit for wallet state to stabilize
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Check again after reconnection attempt
-        if (!isConnected || !address) {
-          toast.error("Please connect your wallet first", { duration: 3000 });
-          return;
-        }
-      }
-      
-      // Set transaction as pending
-      setIsTransactionPending(true);
-      
-      // Show loading toast
-      toast.loading("Preparing transaction...", {
-        id: "tx-loading",
-        duration: 10000
-      });
-      
-      // For Farcaster environment, ensure wallet is properly authorized
-      const isInFarcaster = typeof window !== 'undefined' && window.parent !== window;
-      if (isInFarcaster) {
-        // In Farcaster, we need to ensure the wallet is properly connected
-        // and the user has authorized the transaction
-        console.log("Farcaster environment detected, ensuring wallet authorization...");
-        
-        // Wait a bit for wallet state to be fully ready
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Check if wallet is still connected
-        if (!isConnected || !address) {
-          toast.dismiss("tx-loading");
-          setIsTransactionPending(false);
-          toast.error("Wallet connection lost. Please reconnect.", { duration: 3000 });
-          return;
-        }
-      }
-      
-      // Switch network if needed - but only for non-Farcaster environments
-      if (chainId !== MONAD_CHAIN_ID && !isInFarcaster) {
-        try {
-          console.log(`Auto-switching from chain ${chainId} to ${MONAD_CHAIN_ID}`);
+      // Hook'tan gelen gerçek contract verisini kullan
+      if (hookLeaderboard && hookLeaderboard.length > 0) {
+        // Contract verisini UI formatına dönüştür
+        const formattedLeaderboard = hookLeaderboard.map((item: ContractLeaderboardItem, index: number) => {
+          const shortAddress = `${item.userAddress.slice(0, 6)}...${item.userAddress.slice(-4)}`;
+          const isCurrentUser = address ? item.userAddress.toLowerCase() === address.toLowerCase() : false;
           
-          // Show specific message for chain switching
-          toast.loading("Switching to Monad Testnet...", {
-            id: "chain-switch",
-            duration: 8000
-          });
+          // Username olarak kısa wallet adresi kullan
+          const username = isCurrentUser ? "you" : shortAddress.toLowerCase();
           
-          // Use wagmi's switchChain which handles wallet prompts automatically
-          await switchChainAsync({ chainId: MONAD_CHAIN_ID });
-          
-          // Brief wait for chain switch to complete
-          await new Promise(r => setTimeout(r, 1500));
-          
-          console.log("Successfully switched to Monad Testnet");
-          toast.dismiss("chain-switch");
-          toast.success("Switched to Monad Testnet!", { duration: 2000 });
-          
-        } catch (error) {
-          console.error("Network switch error:", error);
-          setIsTransactionPending(false);
-          toast.dismiss("chain-switch");
-          toast.dismiss("tx-loading");
-          
-          if (error instanceof Error && error.message.includes("User rejected")) {
-            toast.error("Network switch cancelled", { duration: 3000 });
-          } else if (error instanceof Error && error.message.includes("Unsupported chain")) {
-            toast.error("Please add Monad Testnet to your wallet", { duration: 5000 });
-          } else {
-            toast.error("Please switch to Monad Testnet manually", { duration: 5000 });
-          }
-          return;
-        }
-      }
-      
-      // Use fixed fee
-      const feeValue = parseEther('0.005'); // 0.005 MON
-      
-      // Handle Farcaster vs regular wallet transactions differently
-      if (isInFarcaster) {
-        // For Farcaster, use a custom approach that bypasses wagmi's chainId validation
-        console.log("Farcaster environment detected, using custom transaction approach");
-        console.log("Wallet client available:", !!walletClient);
-        console.log("Contract address:", contractAddress);
-        console.log("Account address:", address);
-        console.log("Current chain ID:", chainId);
-        console.log("Expected chain ID:", MONAD_CHAIN_ID);
-        
-        // Check if we're on the correct chain for Farcaster
-        if (chainId !== MONAD_CHAIN_ID) {
-          console.log("Chain mismatch detected in Farcaster environment");
-          toast.dismiss("tx-loading");
-          setIsTransactionPending(false);
-          toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
-          return;
-        }
-        
-        try {
-          // For Farcaster, try to use the most minimal approach possible
-          console.log("Attempting minimal Farcaster transaction");
-          
-          // Use a minimal transaction approach that should avoid getChainId
-          const result = await mutation.writeContractAsync({
-            address: contractAddress,
-            abi: counterABI,
-            functionName: "incrementCounter",
-            value: feeValue,
-            // Completely omit all chain-related parameters
-          });
-          
-          console.log("Farcaster transaction successful:", result);
-          
-        } catch (error) {
-          console.error("Farcaster transaction error:", error);
-          
-          // If the first approach fails, show a specific error for Farcaster
-          if (error instanceof Error && error.message.includes("getChainId")) {
-            toast.error("Farcaster wallet issue. Please try refreshing the page.", { duration: 5000 });
-          } else if (error instanceof Error && error.message.includes("ChainMismatch")) {
-            toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
-          } else {
-            throw error;
-          }
-        }
-        
-      } else {
-        // For regular wallets, use normal transaction with full configuration
-        console.log("Regular wallet environment, using standard transaction");
-        console.log("Wallet client available:", !!walletClient);
-        
-        await mutation.writeContractAsync({
-          address: contractAddress,
-          abi: counterABI,
-          functionName: "incrementCounter",
-          chainId: MONAD_CHAIN_ID,
-          value: feeValue,
-          account: address,
+          return {
+            address: shortAddress,
+            userAddress: item.userAddress, // Leaderboard.js için
+            contributions: Number(item.contributions), // Leaderboard.js için
+            contribution: Number(item.contributions),
+            rank: index + 1, // Zaten sıralanmış olarak geliyor
+            username: username,
+            isCurrentUser: isCurrentUser
+          };
         });
+
+        console.log("🏆 Formatted leaderboard data:", formattedLeaderboard);
+        setLeaderboard(formattedLeaderboard);
+      } else {
+        // Contract'ta henüz veri yoksa boş array
+        setLeaderboard([]);
+      }
+    } catch (error) {
+      console.error("Failed to load leaderboard:", error);
+      setLeaderboard([]);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }, [hookLeaderboard, address]);
+
+  // Share cast - dokümana göre
+  const handleShareCast = async () => {
+    try {
+      try {
+        await haptics.impact('light');
+      } catch (error) {
+        console.log("Haptic impact failed:", error);
       }
       
-      // Dismiss loading toast
-      toast.dismiss("tx-loading");
-      
-      // Success message (without waiting for confirmation)
-      toast.success("Transaction sent!", { 
-        id: "tx-success",
-        duration: 3000 
+      const result = await composeCast({
+        text: `I just incremented the Monad Counter to ${counter}! 🚀`,
+        embeds: [window.location.href]
       });
       
-      // Immediately release UI to enable new transactions
-      setIsTransactionPending(false);
-      
-      // Increment user interactions
-      setUserInteractions(prev => prev + 1);
-      
-      // Refresh data to update the counter
-      fetchContractData();
-      
+      if (result && typeof result === 'object' && 'cast' in result) {
+        toast.success("Cast shared!");
+        try {
+          await haptics.notification('success');
+        } catch (error) {
+          console.log("Haptic notification failed:", error);
+        }
+      }
     } catch (error) {
-      console.error("Transaction error:", error);
-      setIsTransactionPending(false);
+      console.error("Failed to share cast:", error);
+      try {
+        await haptics.notification('error');
+      } catch (hapticError) {
+        console.log("Haptic error failed:", hapticError);
+      }
+    }
+  };
+
+
+  // Transaction sonuçlarını handle et
+  useEffect(() => {
+    if (hash && processedHashRef.current !== hash) {
+      // Bu hash'i daha önce işlemedik, işle ve kaydet
+      processedHashRef.current = hash;
+      
+      // Timeout'u temizle - işlem başarılı
+      if (transactionTimeoutRef.current) {
+        clearTimeout(transactionTimeoutRef.current);
+        transactionTimeoutRef.current = null;
+      }
+      
+      console.log("✅ Transaction sent:", hash);
+      toast.dismiss("tx-loading");
+      toast.success("Transaction sent!", { duration: 2000 });
+      
+      // Haptic feedback'i güvenli şekilde çağır
+      (async () => {
+        try {
+          await haptics.notification('success');
+        } catch (error) {
+          console.log("Haptic notification failed:", error);
+        }
+      })();
+      
+      // Counter'ı güncelle ve leaderboard'ı refresh et
+      setTimeout(() => {
+        try {
+          fetchCounter();
+          refreshData(); // Contract verilerini yenile
+        } catch (error) {
+          console.error("Failed to refresh data:", error);
+        }
+        setIsTransactionPending(false);
+      }, 1500);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, haptics]); // fetchCounter ve refreshData kasıtlı olarak dependency'de değil - loop'u önlemek için
+
+  useEffect(() => {
+    if (writeError) {
+      // Timeout'u temizle - işlem hata verdi
+      if (transactionTimeoutRef.current) {
+        clearTimeout(transactionTimeoutRef.current);
+        transactionTimeoutRef.current = null;
+      }
+      
+      console.error("Transaction failed:", writeError);
       toast.dismiss("tx-loading");
       
-      // Enhanced error handling for wallet switching issues
-      if (error instanceof Error) {
-        if (error.message.includes("User rejected")) {
-          toast.error("Transaction cancelled by user", { duration: 3000 });
-        } else if (error.message.includes("chain")) {
-          toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
-        } else if (error.message.includes("unauthorized") || error.message.includes("not been authorized")) {
-          // Handle Farcaster wallet authorization issue
-          toast.error("Wallet authorization required. Please reconnect your wallet.", { duration: 5000 });
-          // Force wallet state refresh
-          refreshWalletState();
-        } else if (error.message.includes("getChainId") || error.message.includes("connector")) {
-          // Handle Farcaster connector specific error
-          toast.error("Wallet connection issue. Please refresh and try again.", { duration: 5000 });
-          refreshWalletState();
-        } else if (error.message.includes("ChainMismatch")) {
-          // Handle chain mismatch error specifically
-          toast.error("Please switch to Monad Testnet in your wallet", { duration: 5000 });
-        } else {
-          toast.error("Transaction failed", { duration: 3000 });
-        }
+      // Genişletilmiş cancel detection
+      const errorMessage = writeError.message?.toLowerCase() || '';
+      const errorName = (writeError as Error & { name?: string })?.name?.toLowerCase() || '';
+      const errorCode = (writeError as Error & { code?: number | string })?.code;
+      
+      const isCancelled = errorMessage.includes("user rejected") || 
+                         errorMessage.includes("user denied") || 
+                         errorMessage.includes("cancelled") ||
+                         errorMessage.includes("rejected by user") ||
+                         errorMessage.includes("user cancelled") ||
+                         errorMessage.includes("rejected the request") ||
+                         errorMessage.includes("transaction rejected") ||
+                         errorMessage.includes("user rejected transaction") ||
+                         errorMessage.includes("denied by the user") ||
+                         errorMessage.includes("cancelled by user") ||
+                         errorName.includes("userrejected") ||
+                         errorCode === 4001 || // MetaMask user rejection code
+                         errorCode === "ACTION_REJECTED"; // WalletConnect rejection
+      
+      if (isCancelled) {
+        console.log("✅ Transaction cancelled by user - loading cleared immediately");
+        (async () => {
+          try {
+            await haptics.notification('warning');
+          } catch (error) {
+            console.log("Haptic warning failed:", error);
+          }
+        })();
       } else {
         toast.error("Transaction failed", { duration: 3000 });
+        (async () => {
+          try {
+            await haptics.notification('error');
+          } catch (error) {
+            console.log("Haptic error failed:", error);
+          }
+        })();
       }
+      setIsTransactionPending(false);
     }
-  }, [contractAddress, isTransactionPending, chainId, mutation, fetchContractData, switchChainAsync, isConnected, address, autoConnectWallet, refreshWalletState]);
+  }, [writeError, haptics]);
 
-  // Add wallet state monitoring
+  // Counter'ı periyodik olarak güncelle
   useEffect(() => {
-    // Monitor wallet state changes and refresh if needed
-    if (isConnected && address) {
-      console.log("Wallet connected:", address);
-      console.log("Current chain ID:", chainId);
-      console.log("Wallet client status:", walletClient ? "Available" : "Not available");
-      
-      // In Farcaster environment, wallet client might not be available initially
-      if (isInWarpcast() && !walletClient) {
-        console.log("Farcaster environment detected - wallet client not available (this is normal)");
-      }
+    fetchCounter();
+    const interval = setInterval(fetchCounter, 15000);
+    return () => clearInterval(interval);
+  }, [contractAddress, fetchCounter]);
+
+  // Hook'tan gelen leaderboard verisini otomatik güncelle
+  useEffect(() => {
+    if (hookLeaderboard) {
+      fetchLeaderboard();
     }
-  }, [isConnected, address, chainId, walletStateVersion, walletClient, isInWarpcast]);
+  }, [hookLeaderboard, fetchLeaderboard]);
+
+  // Cleanup - component unmount olduğunda timeout'u temizle
+  useEffect(() => {
+    return () => {
+      if (transactionTimeoutRef.current) {
+        clearTimeout(transactionTimeoutRef.current);
+        transactionTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // Dokümana göre: ready() çağrısını uygulama tamamen yüklendikten sonra yap
+  useEffect(() => {
+    if (!isInitialDataLoaded) {
+      // Component mount olduktan sonra kısa bir süre bekle ki UI render olsun
+      const timer = setTimeout(async () => {
+        setIsInitialDataLoaded(true);
+        
+        // Dokümana göre - uygulama görüntülenmeye hazır olduğunda çağır
+        await callReady();
+        console.log("✅ App fully loaded and ready - ready() called");
+      }, 100); // 100ms UI'ın render olması için yeterli
+
+      return () => clearTimeout(timer);
+    }
+  }, [isInitialDataLoaded, callReady]);
+
+  // SafeAreaInsets - dokümana göre  
+  const safeAreaStyle = React.useMemo(() => {
+    if (isInMiniApp && context?.client?.safeAreaInsets) {
+      const insets = context.client.safeAreaInsets;
+      return {
+        paddingTop: `${insets.top}px`,
+        paddingBottom: `${insets.bottom}px`,
+        paddingLeft: `${insets.left}px`,
+        paddingRight: `${insets.right}px`,
+      };
+    }
+    return {};
+  }, [isInMiniApp, context]);
   
   return (
-    <FarcasterWrapper>
       <div
-        className={`min-h-screen flex flex-col items-center ${
-          theme === "dark" ? "bg-black text-white" : "bg-white text-black"
+      className={`min-h-screen flex flex-col ${
+        theme === "dark" ? "bg-black text-white" : "bg-white text-gray-900"
         }`}
-        style={{
-          backgroundColor: theme === "dark" ? "#000" : "#fff",
-        }}
+      style={safeAreaStyle}
       >
-        {/* Top Section - Header */}
+      {/* Header */}
         <div className="w-full p-6">
-          <div className="flex items-center justify-between w-full max-w-4xl mx-auto">
-            <h1 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
+        <div className="flex items-center justify-between max-w-4xl mx-auto">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl md:text-2xl font-bold text-purple-600">
               Monad Counter
             </h1>
+          </div>
             <WalletButton />
           </div>
         </div>
 
-        {/* Main Content - Counter */}
-        <div className="flex-1 flex flex-col items-center justify-center w-full px-3 max-w-lg mx-auto">
-          {/* Counter Display */}
-          <div
-            className={`relative overflow-hidden cursor-pointer py-8 px-4 rounded-2xl z-[1] w-full transition-transform hover:scale-102 active:scale-98 ${
-              isTransactionPending ? "pointer-events-none opacity-50" : ""
-            }`}
-            onClick={async () => {
-              // If a transaction is pending, block interaction
-              if (isTransactionPending) {
-                return;
-              }
-
-              try {
-                // Check if wallet is connected
-                if (!isConnected) {
-                  // Auto-connect the wallet first
-                  await autoConnectWallet();
-                  
-                  // Return for now, user can tap again after connecting
-                  return;
-                }
-                
-                // Validate wallet state before proceeding
-                if (!address) {
-                  console.log("Address not available, refreshing wallet state...");
-                  refreshWalletState();
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                }
-                
-                // Wallet is connected, proceed with transaction
-                await handleIncrement();
-              } catch (error) {
-                console.error("Increment error:", error);
-              }
-            }}
-          >
-            {/* Background Pattern */}
-            <div className="absolute inset-0 opacity-50 z-[-1]" />
-
-            <div className="relative text-center">
-              {/* Chain Status Indicator */}
+      {/* Main Counter */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4">
+        <div 
+          className={`cursor-pointer py-8 px-6 text-center transition-all duration-200 ${
+            isTransactionPending ? "pointer-events-none opacity-70 scale-95" : "hover:scale-105"
+          }`}
+          onClick={handleIncrement}
+        >
+          {/* Chain warning */}
               {isConnected && chainId !== MONAD_CHAIN_ID && (
-                <div className="mb-4 p-3 bg-orange-100 dark:bg-orange-900/20 border border-orange-300 dark:border-orange-700 rounded-lg">
+            <div className="mb-6 p-3 bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-lg">
                   <div className="text-orange-800 dark:text-orange-200 text-sm font-medium">
                     ⚠️ Wrong Network
                   </div>
                   <div className="text-orange-600 dark:text-orange-300 text-xs mt-1">
-                    {isInWarpcast() 
-                      ? "Please switch to Monad Testnet in your wallet"
-                      : "Switching to Monad Testnet..."
-                    }
+                Please switch to Monad Testnet
                   </div>
                 </div>
               )}
               
-              {/* Counter Value */}
-              <div className="py-4">
-                <div 
-                  className={`relative font-mono font-bold mb-4
-                    ${displayedCounter.length > 6 ? "text-[32px] sm:text-[44px] md:text-[64px]" : "text-[56px] sm:text-[72px] md:text-[96px]"}
-                    transition-all duration-200 drop-shadow-sm
-                  `}
-                >
-                  <span className="relative inline-block px-2 py-1">
-                    <span className="relative z-10 bg-gradient-to-br from-violet-400 to-purple-600 bg-clip-text text-transparent">
-                      {displayedCounter.replace(/\B(?=(\d{3})+(?!\d))/g, " ") || "0"}
-                    </span>
-                    <span className="absolute inset-0 rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-600/10 blur-xl"></span>
-                    <span className={`absolute inset-0 rounded-xl ${theme === "dark" ? "bg-black/40" : "bg-white/40"} backdrop-blur-sm -z-10`}></span>
-                  </span>
-                </div>
-                <div className="text-center text-xs text-gray-400 mt-2 select-none">
-                  {isTransactionPending ? "Transaction in progress..." : isConnected ? "Tap to increase" : "Tap to connect and increase"}
-                </div>
-               
-              </div>
+          {/* Counter value */}
+          <div className="mb-4">
+            <div className="text-6xl md:text-8xl font-bold font-mono text-purple-600">
+              {counter.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
             </div>
+          </div>
+          
+          <div className="text-sm text-gray-500 flex items-center justify-center gap-2">
+            {isTransactionPending ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-500 border-t-transparent"></div>
+                Transaction pending...
+              </>
+            ) : (
+              isConnected ? "Tap to increment" : "Connect wallet to increment"
+            )}
           </div>
         </div>
 
-        {/* Bottom Section - Footer with links */}
-        <div className="w-full p-4 mt-auto">
-          <div className="flex items-center justify-center gap-4 text-sm">
+      </div>
+
+      {/* Footer */}
+      <div className="w-full p-6">
+        <div className="flex items-center justify-center gap-6 text-sm">
+          {isInMiniApp && (
             <button 
-              onClick={() => setIsStatsModalOpen(true)}
-              className={`text-sm ${theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"} transition-colors`}
+              onClick={handleShareCast}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors"
+            >
+              Share Cast
+            </button>
+          )}
+          <button 
+            onClick={() => {
+              setIsLeaderboardOpen(true);
+              fetchLeaderboard();
+            }}
+            className={`${theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"} transition-colors`}
             >
               Leaderboard
             </button>
             <button 
               onClick={() => setIsHowItWorksOpen(true)}
-              className={`text-sm ${theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"} transition-colors`}
+            className={`${theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"} transition-colors`}
             >
               How it works
             </button>
           </div>
         </div>
-
-        {/* User Stats */}
-        
-        {/* Farcaster Share Footer */}
-        <FarcasterShareFooter counterValue={displayedCounter} />
-        
         
         {/* Modals */}
-        {isStatsModalOpen && (
+      {isLeaderboardOpen && (
           <LeaderboardModal 
-            onClose={() => setIsStatsModalOpen(false)}
-            leaderboard={directLeaderboard}
-            loading={directLeaderboardLoading}
+          onClose={() => setIsLeaderboardOpen(false)}
+          leaderboard={leaderboard}
+          loading={leaderboardLoading}
             theme={theme}
             address={address}
             userStats={userStats}
@@ -726,21 +662,14 @@ function WarpcastCounter() {
             contributionTarget={contributionTarget}
           />
         )}
-        {isAccountModalOpen && (
-          <AccountModal
-            isOpen={isAccountModalOpen}
-            onClose={() => setIsAccountModalOpen(false)}
-            theme={theme}
-          />
-        )}
+      
         {isHowItWorksOpen && (
           <HowItWorksModal
             onClose={() => setIsHowItWorksOpen(false)}
             theme={theme}
-            fee={fee}
+          fee={parseEther('0.005')}
           />
         )}
       </div>
-    </FarcasterWrapper>
   );
 }

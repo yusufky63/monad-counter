@@ -1,36 +1,36 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
+// Farcaster Mini App connector - dokümana göre
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { createConfig, http, WagmiProvider } from "wagmi";
 import { monadTestnet } from "wagmi/chains";
 import { injected, metaMask } from "wagmi/connectors";
 
-// Basit RPC yapılandırması
+// Monad Testnet RPC configuration
 const MONAD_RPC = "https://testnet-rpc.monad.xyz";
 
-// Warpcast dokümantasyonuna uygun basit config
+// Wagmi configuration following Farcaster Mini App docs
 export const config = createConfig({
   chains: [monadTestnet],
   transports: {
     [monadTestnet.id]: http(MONAD_RPC, {
-      timeout: 20000, // Daha uzun timeout
-      retryCount: 3, // Hata durumunda tekrar dene
+      timeout: 20000,
+      retryCount: 3,
       fetchOptions: {
-        cache: "no-cache", // Önbellek sorunlarını önle
+        cache: "no-cache",
       },
     }),
   },
   connectors: [
-    farcasterFrame(), // Farcaster için - her zaman ilk sırada
-    injected(), // Tarayıcı cüzdanları için
-    metaMask(), // MetaMask özel desteği
+    farcasterMiniApp(), // Farcaster Mini App connector
+    injected(),
+    metaMask(),
   ],
-  // Add custom configuration for better Farcaster compatibility
-  ssr: false, // Disable SSR for Farcaster compatibility
+  ssr: false, // SSR'ı devre dışı bırak
 });
 
-// Sade sorgu yapılandırması
+// Query client configuration
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -49,7 +49,9 @@ export default function FrameWalletProvider({
 }) {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
     </WagmiProvider>
   );
 }
