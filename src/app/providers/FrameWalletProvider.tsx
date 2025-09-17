@@ -10,6 +10,21 @@ import { injected, metaMask } from "wagmi/connectors";
 // Monad Testnet RPC configuration
 const MONAD_RPC = "https://testnet-rpc.monad.xyz";
 
+// Lazy connector initialization - timing sorunlarını önlemek için
+const getConnectors = () => {
+  try {
+    return [
+      farcasterMiniApp(), // Farcaster Mini App connector
+      injected(),
+      metaMask(),
+    ];
+  } catch (error) {
+    console.warn("Some connectors failed to initialize:", error);
+    // Fallback connectors
+    return [injected()];
+  }
+};
+
 // Wagmi configuration following Farcaster Mini App docs
 export const config = createConfig({
   chains: [monadTestnet],
@@ -22,11 +37,7 @@ export const config = createConfig({
       },
     }),
   },
-  connectors: [
-    farcasterMiniApp(), // Farcaster Mini App connector
-    injected(),
-    metaMask(),
-  ],
+  connectors: getConnectors(),
   ssr: false, // SSR'ı devre dışı bırak
 });
 

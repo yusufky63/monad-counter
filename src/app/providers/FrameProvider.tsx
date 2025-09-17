@@ -129,12 +129,35 @@ export function FrameProvider({ children }: FrameProviderProps) {
   const callReady = async () => {
     if (!isReadyCalled) {
       try {
-        await sdk.actions.ready();
+        console.log("📱 Calling sdk.actions.ready() - Mobile compatibility check");
+        
+        // Mobile detection
+        const isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          typeof navigator !== 'undefined' ? navigator.userAgent : ''
+        );
+        
+        if (isMobile) {
+          console.log("📱 Mobile device detected - ensuring ready() call");
+        }
+        
+        // Timeout ile ready() çağrısı - mobile'da takılması durumuna karşı
+        const readyPromise = sdk.actions.ready();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Ready timeout')), 5000) // 5 saniye timeout
+        );
+        
+        await Promise.race([readyPromise, timeoutPromise]);
         setIsReadyCalled(true);
+        
+        console.log("✅ sdk.actions.ready() completed successfully");
+        
       } catch (error) {
-        // Development ortamında hata normal olabilir, yine de devam et
-        console.error("Failed to call ready():", error);
+        console.error("❌ Failed to call ready():", error);
+        console.log("🔄 Marking as ready anyway for compatibility");
+        setIsReadyCalled(true); // Mark as called even if failed
       }
+    } else {
+      console.log("⚠️ Ready already called, skipping duplicate call");
     }
   };
 

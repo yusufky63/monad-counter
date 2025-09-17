@@ -38,16 +38,28 @@ interface LeaderboardUIItem {
 }
 
 export default function MonadCounterApp() {
-  const { isSDKLoaded, isInMiniApp } = useFrame();
+  const { isSDKLoaded, isInMiniApp, callReady } = useFrame();
   const [isAppReady, setIsAppReady] = useState(false);
 
-  // SDK yüklendikten sonra uygulama içeriğini hazırla
+  // Mobile için agresif ready() çağrısı - SDK yüklenir yüklenmez
   useEffect(() => {
     if (isSDKLoaded) {
-      // İlk önce uygulama içeriğini göster, ready() çağrısını CounterApp'e bırak
-      setIsAppReady(true);
+      console.log("🚀 SDK loaded, calling ready() immediately for mobile compatibility");
+      
+      // Mobile için hiç beklemeden ready() çağır
+      (async () => {
+        try {
+          await callReady();
+          console.log("✅ Ready called successfully");
+          setIsAppReady(true);
+        } catch (error) {
+          console.error("❌ Ready call failed:", error);
+          // Yine de app'i göster
+          setIsAppReady(true);
+        }
+      })();
     }
-  }, [isSDKLoaded]);
+  }, [isSDKLoaded, callReady]);
 
   // Loading state - dokümana göre
   if (!isAppReady) {
@@ -70,6 +82,9 @@ export default function MonadCounterApp() {
         </div>
         <div className="text-center mt-4 text-gray-600 dark:text-gray-400 text-sm">
           {isInMiniApp ? "Initializing Mini App..." : "Loading Monad Counter..."}
+          <div className="mt-2 text-xs opacity-70">
+            SDK Loaded: {isSDKLoaded ? "✅" : "⏳"}
+          </div>
         </div>
       </div>
     );
@@ -82,7 +97,7 @@ export default function MonadCounterApp() {
 // Ana Counter bileşeni
 function CounterApp() {
   const { theme } = React.useContext(ThemeContext);
-  const { isInMiniApp, context, haptics, composeCast, callReady } = useFrame();
+  const { isInMiniApp, context, haptics, composeCast } = useFrame();
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const chainId = useChainId();
@@ -92,6 +107,9 @@ function CounterApp() {
     data: hash, 
     error: writeError
   } = useWriteContract();
+  
+  // Connector initialization state
+  const [connectorsReady, setConnectorsReady] = useState(false);
 
   // Counter hook
   const {
@@ -150,16 +168,43 @@ function CounterApp() {
         return;
       }
       
-      // Farcaster Mini App connector'ını kullan
+      // Connector'ların hazır olup olmadığını kontrol et
+      if (!connectors || connectors.length === 0) {
+        console.warn("No connectors available, retrying...");
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
+        if (!connectors || connectors.length === 0) {
+          throw new Error("Connectors not initialized");
+        }
+      }
+      
+      // Farcaster Mini App connector'ını bul
       const farcasterConnector = connectors.find(connector => 
-        connector.name === 'farcasterMiniApp' || connector.id === 'farcaster'
+        connector.name === 'farcasterMiniApp' || 
+        connector.id === 'farcaster' ||
+        connector.name?.toLowerCase().includes('farcaster')
       );
       
+      console.log("Available connectors:", connectors.map(c => ({ name: c.name, id: c.id })));
+      
       if (farcasterConnector) {
-        await connect({ connector: farcasterConnector });
+        console.log("Using Farcaster connector:", farcasterConnector.name);
+        
+        // Connector'ın getChainId metodunu kontrol et
+        if (typeof farcasterConnector.getChainId !== 'function') {
+          console.warn("Farcaster connector not fully initialized, using fallback");
+          await connect({ connector: connectors[0] });
+        } else {
+          await connect({ connector: farcasterConnector });
+        }
       } else {
-        // Fallback
-        await connect({ connector: connectors[0] });
+        console.log("Farcaster connector not found, using first available");
+        // İlk kullanılabilir connector'ı kontrol et
+        const firstConnector = connectors[0];
+        if (firstConnector && typeof firstConnector.getChainId === 'function') {
+          await connect({ connector: firstConnector });
+        } else {
+          throw new Error("No valid connectors available");
+        }
       }
       
       try {
@@ -234,6 +279,26 @@ function CounterApp() {
         await handleNetworkSwitch();
         return; // Network switch'ten sonra tekrar denesin
       }
+      
+      // writeContract hook'unun hazır olup olmadığını kontrol et
+      if (!writeContract) {
+        console.error("writeContract hook not ready");
+        toast.error("Wallet connection not ready, please try again");
+        return;
+      }
+      
+      // Connector validation
+      if (!connectorsReady) {
+        console.error("Connectors not fully initialized");
+        toast.error("Wallet is initializing, please wait and try again");
+        return;
+      }
+      
+      if (connectors.length === 0) {
+        console.error("No connectors available");
+        toast.error("Wallet connectors not available");
+        return;
+      }
 
       setIsTransactionPending(true);
       toast.loading("Sending transaction...", { id: "tx-loading" });
@@ -249,13 +314,19 @@ function CounterApp() {
       }, 5000); // 5 saniye çok agresif
 
       try {
-        // Transaction gönder
-        writeContract({
+        // Transaction gönder - extra validation
+        console.log("📤 Sending transaction to contract:", contractAddress);
+        
+        const txParams = {
           address: contractAddress,
           abi: counterABI,
           functionName: "incrementCounter",
           value: parseEther('0.005'), // 0.005 MON fee
-        });
+        };
+        
+        console.log("Transaction params:", txParams);
+        writeContract(txParams);
+        
       } catch (writeError: unknown) {
         // writeContract'tan gelen immediate hata
         if (transactionTimeoutRef.current) {
@@ -529,21 +600,43 @@ function CounterApp() {
     };
   }, []);
 
-  // Dokümana göre: ready() çağrısını uygulama tamamen yüklendikten sonra yap
+  // Connector initialization watcher - connector'ların hazır olmasını bekle
+  useEffect(() => {
+    const checkConnectors = async () => {
+      if (connectors && connectors.length > 0) {
+        console.log("🔌 Checking connectors readiness...");
+        
+        // Connector'ların initialize olması için kısa bir süre bekle
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // En az bir connector'ın getChainId metoduna sahip olup olmadığını kontrol et
+        const readyConnectors = connectors.filter(connector => 
+          connector && typeof connector.getChainId === 'function'
+        );
+        
+        if (readyConnectors.length > 0) {
+          console.log("✅ Connectors ready:", readyConnectors.length);
+          setConnectorsReady(true);
+        } else {
+          console.log("⚠️ Connectors not fully initialized, retrying...");
+          // 2 saniye sonra tekrar kontrol et
+          setTimeout(checkConnectors, 2000);
+        }
+      }
+    };
+    
+    if (!connectorsReady) {
+      checkConnectors();
+    }
+  }, [connectors, connectorsReady]);
+
+  // ready() çağrısı artık MonadCounterApp level'da yapılıyor
   useEffect(() => {
     if (!isInitialDataLoaded) {
-      // Component mount olduktan sonra kısa bir süre bekle ki UI render olsun
-      const timer = setTimeout(async () => {
-        setIsInitialDataLoaded(true);
-        
-        // Dokümana göre - uygulama görüntülenmeye hazır olduğunda çağır
-        await callReady();
-        console.log("✅ App fully loaded and ready - ready() called");
-      }, 100); // 100ms UI'ın render olması için yeterli
-
-      return () => clearTimeout(timer);
+      // Sadece initial data yüklendi işaretini yap
+      setIsInitialDataLoaded(true);
     }
-  }, [isInitialDataLoaded, callReady]);
+  }, [isInitialDataLoaded]);
 
   // SafeAreaInsets - dokümana göre  
   const safeAreaStyle = React.useMemo(() => {
@@ -582,9 +675,9 @@ function CounterApp() {
       <div className="flex-1 flex flex-col items-center justify-center px-4">
         <div 
           className={`cursor-pointer py-8 px-6 text-center transition-all duration-200 ${
-            isTransactionPending ? "pointer-events-none opacity-70 scale-95" : "hover:scale-105"
+            (isTransactionPending || !connectorsReady) ? "pointer-events-none opacity-70 scale-95" : "hover:scale-105"
           }`}
-          onClick={handleIncrement}
+          onClick={connectorsReady ? handleIncrement : undefined}
         >
           {/* Chain warning */}
               {isConnected && chainId !== MONAD_CHAIN_ID && (
@@ -610,6 +703,11 @@ function CounterApp() {
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-500 border-t-transparent"></div>
                 Transaction pending...
+              </>
+            ) : !connectorsReady ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>
+                Initializing wallet...
               </>
             ) : (
               isConnected ? "Tap to increment" : "Connect wallet to increment"
