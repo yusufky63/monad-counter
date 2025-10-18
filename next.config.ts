@@ -11,15 +11,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  async rewrites() {
-    return [
-      {
-        // Rewrite for the Farcaster .well-known directory
-        source: '/.well-known/farcaster.json',
-        destination: '/api/farcaster.json',
-      },
-    ];
-  },
 };
 
 export default nextConfig;

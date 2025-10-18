@@ -2,14 +2,22 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ThemeContext } from "./context/ThemeContext";
 import { toast } from "react-hot-toast";
-import { useAccount, useConnect, useWriteContract, useChainId, useSwitchChain } from "wagmi";
-import { parseEther } from 'viem/utils';
+import {
+  useAccount,
+  useConnect,
+  useWriteContract,
+  useChainId,
+  useSwitchChain,
+} from "wagmi";
+import { parseEther } from "viem/utils";
 
 // Components - dokümana göre
 import { useFrame } from "./providers/FrameProvider";
 import LeaderboardModal from "./components/LeaderboardModal";
 import HowItWorksModal from "./components/HowItWorksModal";
+import OtherAppsModal from "./components/OtherAppsModal";
 import WalletButton from "./components/WalletButton";
+// Removed unused Farcaster components
 
 // Utils and contract
 import { getContractAddress } from "./utils/ContractAddresses";
@@ -44,8 +52,10 @@ export default function MonadCounterApp() {
   // Mobile için agresif ready() çağrısı - SDK yüklenir yüklenmez
   useEffect(() => {
     if (isSDKLoaded) {
-      console.log("🚀 SDK loaded, calling ready() immediately for mobile compatibility");
-      
+      console.log(
+        "🚀 SDK loaded, calling ready() immediately for mobile compatibility"
+      );
+
       // Mobile için hiç beklemeden ready() çağır
       (async () => {
         try {
@@ -68,7 +78,7 @@ export default function MonadCounterApp() {
         <div className="w-full max-w-md p-6 animate-pulse">
           {/* Header skeleton */}
           <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded mb-8"></div>
-          
+
           {/* Counter display skeleton */}
           <div className="relative py-8 px-4 rounded-2xl">
             <div className="h-48 bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
@@ -81,15 +91,36 @@ export default function MonadCounterApp() {
           </div>
         </div>
         <div className="text-center mt-4 text-gray-600 dark:text-gray-400 text-sm">
-          {isInMiniApp ? "Initializing Mini App..." : "Loading Monad Counter..."}
-          <div className="mt-2 text-xs opacity-70">
-            SDK Loaded: {isSDKLoaded ? "✅" : "⏳"}
+          {isInMiniApp
+            ? "Initializing Mini App..."
+            : "Loading Monad Counter..."}
+          <div className="mt-2 text-xs opacity-70 space-y-1">
+            <div>SDK Loaded: {isSDKLoaded ? "✅" : "⏳"}</div>
+            <div>In Mini App: {isInMiniApp ? "✅" : "❌"}</div>
+            <div>
+              Platform:{" "}
+              {typeof navigator !== "undefined"
+                ? /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+                    navigator.userAgent
+                  )
+                  ? "📱 Mobile"
+                  : "💻 Desktop"
+                : "🔍 Unknown"}
+            </div>
+            <div>
+              Context:{" "}
+              {typeof window !== "undefined"
+                ? window.parent !== window
+                  ? "🖼️ Iframe"
+                  : "🌐 Direct"
+                : "🔍 SSR"}
+            </div>
           </div>
         </div>
       </div>
     );
   }
-  
+
   // Render main app
   return <CounterApp />;
 }
@@ -97,17 +128,13 @@ export default function MonadCounterApp() {
 // Ana Counter bileşeni
 function CounterApp() {
   const { theme } = React.useContext(ThemeContext);
-  const { isInMiniApp, context, haptics, composeCast } = useFrame();
+  // Haptics removed
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  const { 
-    writeContract, 
-    data: hash, 
-    error: writeError
-  } = useWriteContract();
-  
+  const { writeContract, data: hash, error: writeError } = useWriteContract();
+
   // Connector initialization state
   const [connectorsReady, setConnectorsReady] = useState(false);
 
@@ -118,25 +145,26 @@ function CounterApp() {
     contributionTarget,
     rankDetails,
     leaderboard: hookLeaderboard,
-    refreshData
+    refreshData,
   } = useCounter({
     chainId: MONAD_CHAIN_ID,
     address,
-    isConnected
+    isConnected,
   });
-  
+
   // State
   const [counter, setCounter] = useState("0");
   const [isLeaderboardOpen, setIsLeaderboardOpen] = useState(false);
   const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+  const [isOtherAppsOpen, setIsOtherAppsOpen] = useState(false);
   const [isTransactionPending, setIsTransactionPending] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardUIItem[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
-  
+
   // Transaction timeout ref
   const transactionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-  
+
   // Processed hash ref - loop'u önlemek için
   const processedHashRef = React.useRef<string | null>(null);
 
@@ -149,17 +177,12 @@ function CounterApp() {
       return null;
     }
   }, []);
-  
+
   // Wallet connection - dokümana göre - SADECE MONAD AĞI
   const handleWalletConnect = async () => {
     try {
-      // Haptic feedback
-      try {
-        await haptics.selection();
-      } catch (error) {
-        console.log("Haptic selection failed:", error);
-      }
-      
+      // Haptic feedback removed
+
       if (isConnected) {
         // Zaten bağlı ama ağı kontrol et
         if (chainId !== MONAD_CHAIN_ID) {
@@ -167,31 +190,37 @@ function CounterApp() {
         }
         return;
       }
-      
+
       // Connector'ların hazır olup olmadığını kontrol et
       if (!connectors || connectors.length === 0) {
         console.warn("No connectors available, retrying...");
-        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 saniye bekle
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // 1 saniye bekle
         if (!connectors || connectors.length === 0) {
           throw new Error("Connectors not initialized");
         }
       }
-      
+
       // Farcaster Mini App connector'ını bul
-      const farcasterConnector = connectors.find(connector => 
-        connector.name === 'farcasterMiniApp' || 
-        connector.id === 'farcaster' ||
-        connector.name?.toLowerCase().includes('farcaster')
+      const farcasterConnector = connectors.find(
+        (connector) =>
+          connector.name === "farcasterMiniApp" ||
+          connector.id === "farcaster" ||
+          connector.name?.toLowerCase().includes("farcaster")
       );
-      
-      console.log("Available connectors:", connectors.map(c => ({ name: c.name, id: c.id })));
-      
+
+      console.log(
+        "Available connectors:",
+        connectors.map((c) => ({ name: c.name, id: c.id }))
+      );
+
       if (farcasterConnector) {
         console.log("Using Farcaster connector:", farcasterConnector.name);
-        
+
         // Connector'ın getChainId metodunu kontrol et
-        if (typeof farcasterConnector.getChainId !== 'function') {
-          console.warn("Farcaster connector not fully initialized, using fallback");
+        if (typeof farcasterConnector.getChainId !== "function") {
+          console.warn(
+            "Farcaster connector not fully initialized, using fallback"
+          );
           await connect({ connector: connectors[0] });
         } else {
           await connect({ connector: farcasterConnector });
@@ -200,34 +229,24 @@ function CounterApp() {
         console.log("Farcaster connector not found, using first available");
         // İlk kullanılabilir connector'ı kontrol et
         const firstConnector = connectors[0];
-        if (firstConnector && typeof firstConnector.getChainId === 'function') {
+        if (firstConnector && typeof firstConnector.getChainId === "function") {
           await connect({ connector: firstConnector });
         } else {
           throw new Error("No valid connectors available");
         }
       }
-      
-      try {
-        await haptics.notification('success');
-      } catch (error) {
-        console.log("Haptic notification failed:", error);
-      }
+
+      // Success notification removed
       toast.success("Wallet connected!");
-      
+
       // Bağlandıktan sonra hemen Monad ağına switch et
       setTimeout(() => {
         if (chainId !== MONAD_CHAIN_ID) {
           handleNetworkSwitch();
         }
       }, 1000);
-      
     } catch (error) {
       console.error("Wallet connection failed:", error);
-      try {
-        await haptics.notification('error');
-      } catch (hapticError) {
-        console.log("Haptic error failed:", hapticError);
-      }
       toast.error("Failed to connect wallet");
     }
   };
@@ -239,61 +258,79 @@ function CounterApp() {
       await switchChain({ chainId: MONAD_CHAIN_ID });
       toast.dismiss("network-switch");
       toast.success("Switched to Monad Testnet!");
-      try {
-        await haptics.notification('success');
-      } catch (error) {
-        console.log("Haptic notification failed:", error);
-      }
+      // Success notification removed
     } catch (error) {
       toast.dismiss("network-switch");
       console.error("Network switch failed:", error);
       toast.error("Please manually switch to Monad Testnet");
-      try {
-        await haptics.notification('error');
-      } catch (hapticError) {
-        console.log("Haptic error failed:", hapticError);
-      }
     }
   };
 
   // Counter artırma - dokümana göre
   const handleIncrement = async () => {
     if (!contractAddress || isTransactionPending) return;
-    
+
     try {
-      // Haptic feedback
-      try {
-        await haptics.impact('medium');
-      } catch (error) {
-        console.log("Haptic impact failed:", error);
-      }
-      
-      // Wallet bağlantısını kontrol et
+      console.log("🔍 Checking prerequisites for counter increment...");
+
+      // 1. Wallet bağlantısını kontrol et
       if (!isConnected) {
+        console.log("❌ Wallet not connected, connecting...");
         await handleWalletConnect();
         return;
       }
-      
-      // Chain kontrolü - SADECE MONAD KABUL ET
+
+      // 2. MONAD AĞI ZORUNLU KONTROLÜ - İşlem yapmadan önce kesinlikle kontrol et
+      console.log(
+        `🌐 Current network: ${chainId}, Required: ${MONAD_CHAIN_ID}`
+      );
       if (chainId !== MONAD_CHAIN_ID) {
-        await handleNetworkSwitch();
-        return; // Network switch'ten sonra tekrar denesin
+        console.log(
+          "⚠️ Wrong network! Must be on Monad Testnet for transactions"
+        );
+        toast("⚠️ Switching to Monad Testnet for transaction...", {
+          duration: 3000,
+          style: { background: "#f59e0b", color: "white" },
+        });
+
+        try {
+          await handleNetworkSwitch();
+          // Network değiştikten sonra kısa bir bekleme
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+
+          // Tekrar kontrol et - hala yanlış ağdaysa işlemi durdur
+          if (chainId !== MONAD_CHAIN_ID) {
+            toast.error("Please switch to Monad Testnet to use the counter");
+            return;
+          }
+
+          console.log("✅ Successfully switched to Monad Testnet");
+          toast.success("Ready for transaction on Monad!", { duration: 2000 });
+        } catch (error) {
+          console.error("❌ Failed to switch network:", error);
+          toast.error(
+            "Failed to switch to Monad Testnet. Please switch manually."
+          );
+          return;
+        }
+      } else {
+        console.log("✅ Already on Monad Testnet");
       }
-      
+
       // writeContract hook'unun hazır olup olmadığını kontrol et
       if (!writeContract) {
         console.error("writeContract hook not ready");
         toast.error("Wallet connection not ready, please try again");
         return;
       }
-      
+
       // Connector validation
       if (!connectorsReady) {
         console.error("Connectors not fully initialized");
         toast.error("Wallet is initializing, please wait and try again");
         return;
       }
-      
+
       if (connectors.length === 0) {
         console.error("No connectors available");
         toast.error("Wallet connectors not available");
@@ -302,7 +339,7 @@ function CounterApp() {
 
       setIsTransactionPending(true);
       toast.loading("Sending transaction...", { id: "tx-loading" });
-      
+
       // Yeni transaction başladı - previous hash'i temizle
       processedHashRef.current = null;
 
@@ -316,53 +353,47 @@ function CounterApp() {
       try {
         // Transaction gönder - extra validation
         console.log("📤 Sending transaction to contract:", contractAddress);
-        
+
         const txParams = {
           address: contractAddress,
           abi: counterABI,
           functionName: "incrementCounter",
-          value: parseEther('0.005'), // 0.005 MON fee
+          value: parseEther("0.005"), // 0.005 MON fee
         };
-        
+
         console.log("Transaction params:", txParams);
         writeContract(txParams);
-        
       } catch (writeError: unknown) {
         // writeContract'tan gelen immediate hata
         if (transactionTimeoutRef.current) {
           clearTimeout(transactionTimeoutRef.current);
           transactionTimeoutRef.current = null;
         }
-        
+
         console.error("WriteContract immediate error:", writeError);
-        
+
         // Immediate cancel detection
-        const errorMessage = (writeError as Error & { message?: string })?.message?.toLowerCase() || '';
-        const errorCode = (writeError as Error & { code?: number | string })?.code;
-        const isCancelledImmediate = errorMessage.includes("user rejected") || 
-                                   errorMessage.includes("cancelled") ||
-                                   errorCode === 4001;
-        
+        const errorMessage =
+          (
+            writeError as Error & { message?: string }
+          )?.message?.toLowerCase() || "";
+        const errorCode = (writeError as Error & { code?: number | string })
+          ?.code;
+        const isCancelledImmediate =
+          errorMessage.includes("user rejected") ||
+          errorMessage.includes("cancelled") ||
+          errorCode === 4001;
+
         toast.dismiss("tx-loading");
-        
+
         if (isCancelledImmediate) {
           console.log("🚫 Transaction cancelled immediately");
-          try {
-            await haptics.notification('warning');
-          } catch (error) {
-            console.log("Haptic warning failed:", error);
-          }
+          // Warning notification removed
         } else {
           toast.error("Failed to send transaction", { duration: 3000 });
-          try {
-            await haptics.notification('error');
-          } catch (error) {
-            console.log("Haptic error failed:", error);
-          }
         }
         setIsTransactionPending(false);
       }
-      
     } catch (error: unknown) {
       if (transactionTimeoutRef.current) {
         clearTimeout(transactionTimeoutRef.current);
@@ -371,11 +402,6 @@ function CounterApp() {
       console.error("Setup error:", error);
       toast.dismiss("tx-loading");
       toast.error("Transaction setup failed");
-      try {
-        await haptics.notification('error');
-      } catch (hapticError) {
-        console.log("Haptic error failed:", hapticError);
-      }
       setIsTransactionPending(false);
     }
   };
@@ -383,7 +409,7 @@ function CounterApp() {
   // Counter değerini getir
   const fetchCounter = useCallback(async () => {
     if (!contractAddress) return;
-    
+
     try {
       const response = await fetch("https://testnet-rpc.monad.xyz", {
         method: "POST",
@@ -395,13 +421,13 @@ function CounterApp() {
           params: [
             {
               to: contractAddress,
-              data: "0x61bc221a" // counter() function signature
+              data: "0x61bc221a", // counter() function signature
             },
-            "latest"
-          ]
-        })
+            "latest",
+          ],
+        }),
       });
-      
+
       const data = await response.json();
       if (data.result) {
         const value = parseInt(data.result, 16).toString();
@@ -411,7 +437,7 @@ function CounterApp() {
       console.error("Failed to fetch counter:", error);
     }
   }, [contractAddress]);
-  
+
   // Leaderboard yükle - gerçek contract verilerini kullan
   const fetchLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true);
@@ -419,23 +445,30 @@ function CounterApp() {
       // Hook'tan gelen gerçek contract verisini kullan
       if (hookLeaderboard && hookLeaderboard.length > 0) {
         // Contract verisini UI formatına dönüştür
-        const formattedLeaderboard = hookLeaderboard.map((item: ContractLeaderboardItem, index: number) => {
-          const shortAddress = `${item.userAddress.slice(0, 6)}...${item.userAddress.slice(-4)}`;
-          const isCurrentUser = address ? item.userAddress.toLowerCase() === address.toLowerCase() : false;
-          
-          // Username olarak kısa wallet adresi kullan
-          const username = isCurrentUser ? "you" : shortAddress.toLowerCase();
-          
-          return {
-            address: shortAddress,
-            userAddress: item.userAddress, // Leaderboard.js için
-            contributions: Number(item.contributions), // Leaderboard.js için
-            contribution: Number(item.contributions),
-            rank: index + 1, // Zaten sıralanmış olarak geliyor
-            username: username,
-            isCurrentUser: isCurrentUser
-          };
-        });
+        const formattedLeaderboard = hookLeaderboard.map(
+          (item: ContractLeaderboardItem, index: number) => {
+            const shortAddress = `${item.userAddress.slice(
+              0,
+              6
+            )}...${item.userAddress.slice(-4)}`;
+            const isCurrentUser = address
+              ? item.userAddress.toLowerCase() === address.toLowerCase()
+              : false;
+
+            // Username olarak kısa wallet adresi kullan
+            const username = isCurrentUser ? "you" : shortAddress.toLowerCase();
+
+            return {
+              address: shortAddress,
+              userAddress: item.userAddress, // Leaderboard.js için
+              contributions: Number(item.contributions), // Leaderboard.js için
+              contribution: Number(item.contributions),
+              rank: index + 1, // Zaten sıralanmış olarak geliyor
+              username: username,
+              isCurrentUser: isCurrentUser,
+            };
+          }
+        );
 
         console.log("🏆 Formatted leaderboard data:", formattedLeaderboard);
         setLeaderboard(formattedLeaderboard);
@@ -451,64 +484,24 @@ function CounterApp() {
     }
   }, [hookLeaderboard, address]);
 
-  // Share cast - dokümana göre
-  const handleShareCast = async () => {
-    try {
-      try {
-        await haptics.impact('light');
-      } catch (error) {
-        console.log("Haptic impact failed:", error);
-      }
-      
-      const result = await composeCast({
-        text: `I just incremented the Monad Counter to ${counter}! 🚀`,
-        embeds: [window.location.href]
-      });
-      
-      if (result && typeof result === 'object' && 'cast' in result) {
-        toast.success("Cast shared!");
-        try {
-          await haptics.notification('success');
-        } catch (error) {
-          console.log("Haptic notification failed:", error);
-        }
-      }
-    } catch (error) {
-      console.error("Failed to share cast:", error);
-      try {
-        await haptics.notification('error');
-      } catch (hapticError) {
-        console.log("Haptic error failed:", hapticError);
-      }
-    }
-  };
-
-
   // Transaction sonuçlarını handle et
   useEffect(() => {
     if (hash && processedHashRef.current !== hash) {
       // Bu hash'i daha önce işlemedik, işle ve kaydet
       processedHashRef.current = hash;
-      
+
       // Timeout'u temizle - işlem başarılı
       if (transactionTimeoutRef.current) {
         clearTimeout(transactionTimeoutRef.current);
         transactionTimeoutRef.current = null;
       }
-      
+
       console.log("✅ Transaction sent:", hash);
       toast.dismiss("tx-loading");
       toast.success("Transaction sent!", { duration: 2000 });
-      
-      // Haptic feedback'i güvenli şekilde çağır
-      (async () => {
-        try {
-          await haptics.notification('success');
-        } catch (error) {
-          console.log("Haptic notification failed:", error);
-        }
-      })();
-      
+
+      // Haptic feedback removed
+
       // Counter'ı güncelle ve leaderboard'ı refresh et
       setTimeout(() => {
         try {
@@ -518,10 +511,12 @@ function CounterApp() {
           console.error("Failed to refresh data:", error);
         }
         setIsTransactionPending(false);
+
+        // Transaction tamamlandı - otomatik Add Mini App artık FarcasterActions'ta
       }, 1500);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hash, haptics]); // fetchCounter ve refreshData kasıtlı olarak dependency'de değil - loop'u önlemek için
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash]); // fetchCounter ve refreshData kasıtlı olarak dependency'de değil - loop'u önlemek için
 
   useEffect(() => {
     if (writeError) {
@@ -530,51 +525,44 @@ function CounterApp() {
         clearTimeout(transactionTimeoutRef.current);
         transactionTimeoutRef.current = null;
       }
-      
+
       console.error("Transaction failed:", writeError);
       toast.dismiss("tx-loading");
-      
+
       // Genişletilmiş cancel detection
-      const errorMessage = writeError.message?.toLowerCase() || '';
-      const errorName = (writeError as Error & { name?: string })?.name?.toLowerCase() || '';
-      const errorCode = (writeError as Error & { code?: number | string })?.code;
-      
-      const isCancelled = errorMessage.includes("user rejected") || 
-                         errorMessage.includes("user denied") || 
-                         errorMessage.includes("cancelled") ||
-                         errorMessage.includes("rejected by user") ||
-                         errorMessage.includes("user cancelled") ||
-                         errorMessage.includes("rejected the request") ||
-                         errorMessage.includes("transaction rejected") ||
-                         errorMessage.includes("user rejected transaction") ||
-                         errorMessage.includes("denied by the user") ||
-                         errorMessage.includes("cancelled by user") ||
-                         errorName.includes("userrejected") ||
-                         errorCode === 4001 || // MetaMask user rejection code
-                         errorCode === "ACTION_REJECTED"; // WalletConnect rejection
-      
+      const errorMessage = writeError.message?.toLowerCase() || "";
+      const errorName =
+        (writeError as Error & { name?: string })?.name?.toLowerCase() || "";
+      const errorCode = (writeError as Error & { code?: number | string })
+        ?.code;
+
+      const isCancelled =
+        errorMessage.includes("user rejected") ||
+        errorMessage.includes("user denied") ||
+        errorMessage.includes("cancelled") ||
+        errorMessage.includes("rejected by user") ||
+        errorMessage.includes("user cancelled") ||
+        errorMessage.includes("rejected the request") ||
+        errorMessage.includes("transaction rejected") ||
+        errorMessage.includes("user rejected transaction") ||
+        errorMessage.includes("denied by the user") ||
+        errorMessage.includes("cancelled by user") ||
+        errorName.includes("userrejected") ||
+        errorCode === 4001 || // MetaMask user rejection code
+        errorCode === "ACTION_REJECTED"; // WalletConnect rejection
+
       if (isCancelled) {
-        console.log("✅ Transaction cancelled by user - loading cleared immediately");
-        (async () => {
-          try {
-            await haptics.notification('warning');
-          } catch (error) {
-            console.log("Haptic warning failed:", error);
-          }
-        })();
+        console.log(
+          "✅ Transaction cancelled by user - loading cleared immediately"
+        );
+        // Warning notification removed
       } else {
         toast.error("Transaction failed", { duration: 3000 });
-        (async () => {
-          try {
-            await haptics.notification('error');
-          } catch (error) {
-            console.log("Haptic error failed:", error);
-          }
-        })();
+        // Error notification removed
       }
       setIsTransactionPending(false);
     }
-  }, [writeError, haptics]);
+  }, [writeError]);
 
   // Counter'ı periyodik olarak güncelle
   useEffect(() => {
@@ -605,15 +593,15 @@ function CounterApp() {
     const checkConnectors = async () => {
       if (connectors && connectors.length > 0) {
         console.log("🔌 Checking connectors readiness...");
-        
+
         // Connector'ların initialize olması için kısa bir süre bekle
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         // En az bir connector'ın getChainId metoduna sahip olup olmadığını kontrol et
-        const readyConnectors = connectors.filter(connector => 
-          connector && typeof connector.getChainId === 'function'
+        const readyConnectors = connectors.filter(
+          (connector) => connector && typeof connector.getChainId === "function"
         );
-        
+
         if (readyConnectors.length > 0) {
           console.log("✅ Connectors ready:", readyConnectors.length);
           setConnectorsReady(true);
@@ -624,7 +612,7 @@ function CounterApp() {
         }
       }
     };
-    
+
     if (!connectorsReady) {
       checkConnectors();
     }
@@ -638,66 +626,70 @@ function CounterApp() {
     }
   }, [isInitialDataLoaded]);
 
-  // SafeAreaInsets - dokümana göre  
+  // Simplified styling - no safe area insets needed
   const safeAreaStyle = React.useMemo(() => {
-    if (isInMiniApp && context?.client?.safeAreaInsets) {
-      const insets = context.client.safeAreaInsets;
-      return {
-        paddingTop: `${insets.top}px`,
-        paddingBottom: `${insets.bottom}px`,
-        paddingLeft: `${insets.left}px`,
-        paddingRight: `${insets.right}px`,
-      };
-    }
     return {};
-  }, [isInMiniApp, context]);
-  
+  }, []);
+
   return (
-      <div
+    <div
       className={`min-h-screen flex flex-col ${
         theme === "dark" ? "bg-black text-white" : "bg-white text-gray-900"
-        }`}
+      }`}
       style={safeAreaStyle}
-      >
+    >
       {/* Header */}
-        <div className="w-full p-6">
+      <div className="w-full p-6">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div className="flex items-center gap-3">
             <h1 className="text-xl md:text-2xl font-bold text-purple-600">
               Monad Counter
             </h1>
           </div>
-            <WalletButton />
-          </div>
+          <WalletButton />
         </div>
+      </div>
 
       {/* Main Counter */}
       <div className="flex-1 flex flex-col items-center justify-center px-4">
-        <div 
+        <div
           className={`cursor-pointer py-8 px-6 text-center transition-all duration-200 ${
-            (isTransactionPending || !connectorsReady) ? "pointer-events-none opacity-70 scale-95" : "hover:scale-105"
+            isTransactionPending ||
+            !connectorsReady ||
+            (isConnected && chainId !== MONAD_CHAIN_ID)
+              ? "pointer-events-none opacity-70 scale-95"
+              : "hover:scale-105"
           }`}
-          onClick={connectorsReady ? handleIncrement : undefined}
+          onClick={
+            connectorsReady && (!isConnected || chainId === MONAD_CHAIN_ID)
+              ? handleIncrement
+              : undefined
+          }
         >
-          {/* Chain warning */}
-              {isConnected && chainId !== MONAD_CHAIN_ID && (
-            <div className="mb-6 p-3 bg-orange-100 dark:bg-orange-900/30 border border-orange-300 dark:border-orange-700 rounded-lg">
-                  <div className="text-orange-800 dark:text-orange-200 text-sm font-medium">
-                    ⚠️ Wrong Network
-                  </div>
-                  <div className="text-orange-600 dark:text-orange-300 text-xs mt-1">
-                Please switch to Monad Testnet
-                  </div>
-                </div>
-              )}
-              
+          {/* Network Status Warning */}
+          {isConnected && chainId !== MONAD_CHAIN_ID && (
+            <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/30 border-2 border-red-300 dark:border-red-700 rounded-xl animate-pulse">
+              <div className="text-red-800 dark:text-red-200 text-base font-bold flex items-center gap-2">
+                🚫 Wrong Network Detected!
+              </div>
+              <div className="text-red-700 dark:text-red-300 text-sm mt-2 font-medium">
+                Counter only works on <strong>Monad Testnet</strong>
+              </div>
+              <div className="text-red-600 dark:text-red-400 text-xs mt-1">
+                Current: Chain {chainId} • Required: Chain {MONAD_CHAIN_ID}
+              </div>
+            </div>
+          )}
+
+          {/* Network Status - Success */}
+
           {/* Counter value */}
           <div className="mb-4">
             <div className="text-6xl md:text-8xl font-bold font-mono text-purple-600">
               {counter.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
             </div>
           </div>
-          
+
           <div className="text-sm text-gray-500 flex items-center justify-center gap-2">
             {isTransactionPending ? (
               <>
@@ -709,65 +701,90 @@ function CounterApp() {
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>
                 Initializing wallet...
               </>
+            ) : isConnected && chainId !== MONAD_CHAIN_ID ? (
+              <span className="text-red-500 font-medium">
+                ⚠️ Switch to Monad Testnet to increment
+              </span>
+            ) : isConnected && chainId === MONAD_CHAIN_ID ? (
+              <span className="text-gray-600 font-medium">
+                Tap to increment counter
+              </span>
             ) : (
-              isConnected ? "Tap to increment" : "Connect wallet to increment"
+              "Connect wallet to increment"
             )}
           </div>
         </div>
-
       </div>
 
       {/* Footer */}
-      <div className="w-full p-6">
+      <div className="w-full p-6 space-y-4">
+        {/* Navigation Buttons */}
         <div className="flex items-center justify-center gap-6 text-sm">
-          {isInMiniApp && (
-            <button 
-              onClick={handleShareCast}
-              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm transition-colors"
-            >
-              Share Cast
-            </button>
-          )}
-          <button 
+          <button
             onClick={() => {
               setIsLeaderboardOpen(true);
               fetchLeaderboard();
             }}
-            className={`${theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"} transition-colors`}
-            >
-              Leaderboard
-            </button>
-            <button 
-              onClick={() => setIsHowItWorksOpen(true)}
-            className={`${theme === "dark" ? "text-gray-400 hover:text-white" : "text-gray-600 hover:text-black"} transition-colors`}
-            >
-              How it works
-            </button>
-          </div>
+            className={`${
+              theme === "dark"
+                ? "text-gray-400 hover:text-white"
+                : "text-gray-600 hover:text-black"
+            } transition-colors`}
+          >
+            Leaderboard
+          </button>
+          <button
+            onClick={() => setIsOtherAppsOpen(true)}
+            className={`${
+              theme === "dark"
+                ? "text-purple-600 hover:text-white"
+                : "text-purple-600 hover:text-black"
+            } transition-colors animate-pulse`}
+          >
+            Other Apps
+          </button>
+          <button
+            onClick={() => setIsHowItWorksOpen(true)}
+            className={`${
+              theme === "dark"
+                ? "text-gray-400 hover:text-white"
+                : "text-gray-600 hover:text-black"
+            } transition-colors`}
+          >
+            How it works
+          </button>
         </div>
-        
-        {/* Modals */}
+      </div>
+
+      {/* Modals */}
       {isLeaderboardOpen && (
-          <LeaderboardModal 
+        <LeaderboardModal
           onClose={() => setIsLeaderboardOpen(false)}
           leaderboard={leaderboard}
           loading={leaderboardLoading}
-            theme={theme}
-            address={address}
-            userStats={userStats}
-            userRank={userRank}
-            rankDetails={rankDetails}
-            contributionTarget={contributionTarget}
-          />
-        )}
-      
-        {isHowItWorksOpen && (
-          <HowItWorksModal
-            onClose={() => setIsHowItWorksOpen(false)}
-            theme={theme}
-          fee={parseEther('0.005')}
-          />
-        )}
-      </div>
+          theme={theme}
+          address={address}
+          userStats={userStats}
+          userRank={userRank}
+          rankDetails={rankDetails}
+          contributionTarget={contributionTarget}
+        />
+      )}
+
+      {isOtherAppsOpen && (
+        <OtherAppsModal
+          onClose={() => setIsOtherAppsOpen(false)}
+          theme={theme}
+        />
+      )}
+
+      {isHowItWorksOpen && (
+        <HowItWorksModal
+          onClose={() => setIsHowItWorksOpen(false)}
+          theme={theme}
+          fee={parseEther("0.005")}
+        />
+      )}
+    </div>
   );
 }

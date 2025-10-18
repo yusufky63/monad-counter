@@ -7,15 +7,25 @@
   "miniapp": {
     "version": "1",
     "name": "Monad Counter",
-    "description": "On-chain counter mini-app for Monad and Farcaster.",
-    "iconUrl": "https://monad-counter.vercel.app/images/icon.png",
+    "description": "An on-chain counter app powered by Monad blockchain. Increment the global counter and compete on the leaderboard",
+    "subtitle": "On-chain counter for Monad",
+    "iconUrl": "https://monad-counter.vercel.app/icon.png",
     "homeUrl": "https://monad-counter.vercel.app",
-    "imageUrl": "https://monad-counter.vercel.app/images/feed.png",
-    "screenshotUrls": ["https://monad-counter.vercel.app/images/feed.png"],
-    "tags": ["monad", "counter", "blockchain", "web3", "on-chain"],
+    "splashImageUrl": "https://monad-counter.vercel.app/logo.png",
+    "splashBackgroundColor": "#181028",
+    "heroImageUrl": "https://monad-counter.vercel.app/og-image.png",
+    "ogTitle": "Monad Counter",
+    "ogDescription": "Increment the global counter on Monad blockchain and compete with other users",
+    "ogImageUrl": "https://monad-counter.vercel.app/og-image.png",
+    "screenshotUrls": ["https://monad-counter.vercel.app/og-image.png"],
+    "tags": ["monad", "counter", "web3", "onchain"],
     "primaryCategory": "utility",
-    "buttonTitle": "Launch Counter",
-    "splashImageUrl": "https://monad-counter.vercel.app/images/splash.png",
-    "splashBackgroundColor": "#181028"
+    "tagline": "Global on-chain counter",
+    "requiredChains": ["eip155:10143"],
+    "requiredCapabilities": [
+      "wallet.getEthereumProvider",
+      "actions.ready"
+    ],
+    "webhookUrl": "https://monad-counter.vercel.app/api/webhook"
   }
 } 
