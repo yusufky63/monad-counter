@@ -1,6 +1,7 @@
 import React from "react";
 import { FiX, FiExternalLink } from "react-icons/fi";
 import appsData from "../../../apps.json";
+import Image from "next/image";
 
 const OtherAppsModal = ({ theme, onClose }) => {
   const handleAppClick = async (app) => {
@@ -89,8 +90,10 @@ const OtherAppsModal = ({ theme, onClose }) => {
                   <div className="flex items-center gap-3">
                     {/* App Icon */}
                     <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-white/10">
-                      <img
-                        src={`/assets${app.icon.replace("/icons", "")}`}
+                      <Image
+                        src={app.icon}
+                        width={48}
+                        height={48}
                         alt={`${app.name} icon`}
                         className="w-full h-full object-cover"
                         onError={(e) => {
