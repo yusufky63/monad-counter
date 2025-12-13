@@ -9,6 +9,7 @@ import {
   useChainId,
   useSwitchChain,
 } from "wagmi";
+import { sdk } from "@farcaster/miniapp-sdk";
 import { parseEther } from "viem/utils";
 
 // Components - dokümana göre
@@ -48,7 +49,7 @@ interface LeaderboardUIItem {
 }
 
 export default function MonadCounterApp() {
-  const { isSDKLoaded, callReady } = useFrame();
+  const { isSDKLoaded, callReady, isInMiniApp } = useFrame();
   const [isAppReady, setIsAppReady] = useState(false);
 
   // Mobile için agresif ready() çağrısı - SDK yüklenir yüklenmez
@@ -103,6 +104,7 @@ export default function MonadCounterApp() {
 // Ana Counter bileşeni
 function CounterApp() {
   const { theme } = React.useContext(ThemeContext);
+  const { isInMiniApp } = useFrame();
   // Haptics removed
   const { address, isConnected, connector } = useAccount();
   const { connect, connectors } = useConnect();
@@ -136,6 +138,7 @@ function CounterApp() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardUIItem[]>([]);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [isInitialDataLoaded, setIsInitialDataLoaded] = useState(false);
+  const [isIncremented, setIsIncremented] = useState(false);
 
   // Transaction timeout ref
   const transactionTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -505,12 +508,34 @@ function CounterApp() {
           console.error("Failed to refresh data:", error);
         }
         setIsTransactionPending(false);
+        setIsIncremented(true); // Enable share button
 
         // Transaction tamamlandı - otomatik Add Mini App artık FarcasterActions'ta
       }, 1500);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hash]); // fetchCounter ve refreshData kasıtlı olarak dependency'de değil - loop'u önlemek için
+
+  const handleShare = async () => {
+    const text = `I just incremented the global count on Monad Counter! Current count: ${counter}`;
+    const url = window.location.href;
+
+    if (isInMiniApp) {
+      try {
+        await sdk.actions.composeCast({
+          text: text,
+          embeds: [url],
+        });
+      } catch (error) {
+        console.error("Failed to open cast composer:", error);
+      }
+    } else {
+      const intentUrl = `https://farcaster.xyz/~/compose?text=${encodeURIComponent(
+        text
+      )}&embeds[]=${encodeURIComponent(url)}`;
+      window.open(intentUrl);
+    }
+  };
 
   useEffect(() => {
     if (writeError) {
@@ -694,6 +719,18 @@ function CounterApp() {
             )}
           </div>
         </div>
+
+        {/* Share Button (Shows after successful increment) */}
+        {isIncremented && (
+          <div className="mt-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-bold shadow-lg shadow-purple-900/30 transition-all hover:scale-105 active:scale-95"
+            >
+              Share on Farcaster
+            </button>
+          </div>
+        )}
 
         {/* Subtle Network Warning (Outside Card) */}
         {isConnected && chainId !== MONAD_CHAIN_ID && (

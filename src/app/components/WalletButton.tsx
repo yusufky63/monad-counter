@@ -127,7 +127,6 @@ export default function WalletButton() {
     }
   };
 
-
   // Switch to Monad (forced)
   const handleSwitchChain = async () => {
     try {
@@ -235,16 +234,13 @@ export default function WalletButton() {
 
     return (
       <div
-        className={`flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium transition-all border ${
+        className={`flex items-center gap-2 pl-3 pr-4 py-1.5 rounded-full text-sm font-medium transition-all border ${
           isOnMonad
             ? "bg-zinc-900 border-zinc-800 text-purple-400"
             : "bg-amber-950/30 border-amber-900/50 text-amber-500"
         }`}
       >
-        <span
-          className="font-mono text-sm cursor-pointer hover:underline"
-          title={`${address} (click to copy)`}
-        >
+        <span className="font-mono text-sm" title={`${address}`}>
           {displayName}
         </span>
 
@@ -259,31 +255,6 @@ export default function WalletButton() {
             Switch
           </button>
         )}
-
-        <button
-          onClick={handleDisconnect}
-          className={`p-1.5 rounded-full transition-colors ${
-            isOnMonad
-              ? "hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
-              : "hover:bg-amber-900 text-amber-400"
-          }`}
-          title="Disconnect wallet"
-        >
-          <svg
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a2 2 0 01-2 2H7a2 2 0 01-2-2V7a2 2 0 012-2h4a2 2 0 012 2v1"
-            />
-          </svg>
-        </button>
       </div>
     );
   }
