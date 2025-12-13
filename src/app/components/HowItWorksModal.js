@@ -1,12 +1,12 @@
-import React from "react";
+import SupportedChains from "../config/chains";
 
 // Wei formatı için basit yardımcı fonksiyon
 function formatFee(wei) {
   if (!wei) return "0.00002";
-  
+
   // Wei değerini string olarak al
   const weiStr = wei.toString();
-  
+
   // Yeterince uzunsa, sondan 18 karakter eth birimine çevrilir
   if (weiStr.length <= 18) {
     // Wei değeri 1 ETH'den küçük
@@ -22,44 +22,32 @@ function formatFee(wei) {
   }
 }
 
-const HowItWorksModal = ({ theme, onClose, fee }) => {
+const HowItWorksModal = ({ onClose, fee }) => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="fixed inset-0 flex items-center justify-center p-3">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 bg-zinc-950/80 backdrop-blur-sm"
           onClick={onClose}
         />
 
         {/* Modal */}
         <div
-          className={`relative ${
-            theme === "dark"
-              ? "bg-black/90 border-white/10"
-              : "bg-white border-gray-200"
-          } rounded-lg w-full max-w-md overflow-hidden border shadow-lg`}
+          className="relative bg-zinc-900 border-zinc-800 rounded-2xl w-full max-w-md overflow-hidden border shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div
-            className={`p-2 border-b ${
-              theme === "dark" ? "border-white/10" : "border-gray-200"
-            }`}
-          >
+          <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-medium">
+                <h2 className="text-lg font-semibold tracking-tight text-purple-400">
                   How it Works
                 </h2>
               </div>
               <button
                 onClick={onClose}
-                className={`p-1 rounded-lg transition-colors ${
-                  theme === "dark"
-                    ? "hover:bg-white/10"
-                    : "hover:bg-gray-100"
-                }`}
+                className="p-1.5 rounded-full transition-colors hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100"
               >
                 ✕
               </button>
@@ -67,47 +55,43 @@ const HowItWorksModal = ({ theme, onClose, fee }) => {
           </div>
 
           {/* Content */}
-          <div className={`p-3 max-h-[70vh] overflow-y-auto ${
-            theme === "dark"
-              ? "bg-black/20 border-white/10"
-              : "bg-white/60 border-black/5"
-          }`}>
+          <div className="p-4 max-h-[70vh] overflow-y-auto bg-zinc-900/50">
             <div className="space-y-3">
               {/* Basic Information */}
               <div>
-                <h3 className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-blue-400" : "text-blue-600"
-                }`}>
+                <h3 className="text-sm font-semibold mb-2 text-purple-400">
                   📝 How to Play
                 </h3>
-                <ul className={`space-y-1 text-xs ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}>
+                <ul className="space-y-2 text-sm text-zinc-400">
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>Press the counter to increment the global counter</span>
+                    <span>
+                      Press the counter to increment the global counter
+                    </span>
                   </li>
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>Each increment costs {formatFee(fee)} MONAD</span>
+                    <span>
+                      Each increment costs {formatFee(fee)}{" "}
+                      {SupportedChains.monad.nativeCurrency.symbol}
+                    </span>
                   </li>
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>The more you increment, the higher your rank on the leaderboard</span>
+                    <span>
+                      The more you increment, the higher your rank on the
+                      leaderboard
+                    </span>
                   </li>
                 </ul>
               </div>
 
               {/* Leaderboard System */}
               <div>
-                <h3 className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-blue-400" : "text-blue-600"
-                }`}>
+                <h3 className="text-sm font-semibold mb-2 text-purple-400">
                   🏆 Leaderboard
                 </h3>
-                <ul className={`space-y-1 text-xs ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}>
+                <ul className="space-y-2 text-sm text-zinc-400">
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
                     <span>Top players are shown on the leaderboard</span>
@@ -118,29 +102,30 @@ const HowItWorksModal = ({ theme, onClose, fee }) => {
                   </li>
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>Compete with other Farcaster users for the top position</span>
+                    <span>
+                      Compete with other Farcaster users for the top position
+                    </span>
                   </li>
-                 
                 </ul>
               </div>
 
               {/* Farcaster Integration */}
               <div>
-                <h3 className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-blue-400" : "text-blue-600"
-                }`}>
+                <h3 className="text-sm font-semibold mb-2 text-purple-400">
                   🔗 Farcaster Integration
                 </h3>
-                <ul className={`space-y-1 text-xs ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}>
+                <ul className="space-y-2 text-sm text-zinc-400">
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>This app is optimized for use within Farcaster clients</span>
+                    <span>
+                      This app is optimized for use within Farcaster clients
+                    </span>
                   </li>
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>Your Farcaster account is used for the leaderboard</span>
+                    <span>
+                      Your Farcaster account is used for the leaderboard
+                    </span>
                   </li>
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
@@ -151,17 +136,16 @@ const HowItWorksModal = ({ theme, onClose, fee }) => {
 
               {/* Technical Details */}
               <div>
-                <h3 className={`text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-blue-400" : "text-blue-600"
-                }`}>
+                <h3 className="text-sm font-semibold mb-2 text-purple-400">
                   🔒 Technical Details
                 </h3>
-                <ul className={`space-y-1 text-xs ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}>
+                <ul className="space-y-2 text-sm text-zinc-400">
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>Built on MONAD blockchain for fast & low-cost transactions</span>
+                    <span>
+                      Built on {SupportedChains.monad.chainName} for fast &
+                      low-cost transactions
+                    </span>
                   </li>
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
@@ -173,7 +157,9 @@ const HowItWorksModal = ({ theme, onClose, fee }) => {
                   </li>
                   <li className="flex items-start gap-1">
                     <span className="mt-0.5">•</span>
-                    <span>All transactions are transparent on the blockchain</span>
+                    <span>
+                      All transactions are transparent on the blockchain
+                    </span>
                   </li>
                 </ul>
               </div>
@@ -185,4 +171,4 @@ const HowItWorksModal = ({ theme, onClose, fee }) => {
   );
 };
 
-export default HowItWorksModal; 
+export default HowItWorksModal;

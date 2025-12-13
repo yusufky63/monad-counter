@@ -19,52 +19,34 @@ const LeaderboardModal = ({
       <div className="fixed inset-0 flex items-center justify-center p-2 md:p-4">
         {/* Backdrop */}
         <div
-          className={`absolute inset-0 ${
-            theme === "dark" ? "bg-black/50" : "bg-black/20"
-          } backdrop-blur-sm`}
+          className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
           onClick={onClose}
         />
 
         {/* Modal */}
         <div
-          className={`relative w-full max-w-md h-auto max-h-[80vh] flex flex-col ${
-            theme === "dark"
-              ? "bg-black/90 border-white/10"
-              : "bg-white border-gray-200"
-          } rounded-2xl border shadow-xl`}
+          className="relative w-full max-w-md h-auto max-h-[80vh] flex flex-col bg-zinc-900 border-zinc-800 rounded-2xl border shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div
-            className={`p-3 border-b ${
-              theme === "dark" ? "border-white/10" : "border-gray-200"
-            }`}
-          >
+          <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center justify-between">
-              <h3
-                className={`text-base font-medium tracking-tight ${
-                  theme === "dark" ? "text-white" : "text-gray-800"
-                }`}
-              >
-                <span className="bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
-                  Leaderboard
-                </span>
+              <h3 className="text-lg font-semibold tracking-tight text-purple-400">
+                Leaderboard
               </h3>
               <button
                 onClick={onClose}
-                className={`p-1 rounded-full transition-colors ${
-                  theme === "dark" ? "hover:bg-white/10" : "hover:bg-gray-100"
-                }`}
+                className="p-1.5 rounded-full transition-colors hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100"
               >
-                <FiX className="text-red-500" />
+                <FiX size={20} />
               </button>
             </div>
           </div>
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-            <UserStats 
-              userStats={userStats} 
+            <UserStats
+              userStats={userStats}
               userRank={userRank}
               contributionTarget={contributionTarget}
               rankDetails={rankDetails}

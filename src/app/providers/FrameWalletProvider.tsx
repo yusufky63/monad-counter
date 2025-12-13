@@ -4,11 +4,27 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 // Farcaster Mini App connector - dokümana göre
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 import { createConfig, http, WagmiProvider } from "wagmi";
-import { monadTestnet } from "wagmi/chains";
 import { injected, metaMask } from "wagmi/connectors";
+import SupportedChains from "../config/chains";
 
-// Monad Testnet RPC configuration
-const MONAD_RPC = "https://testnet-rpc.monad.xyz";
+// Define Monad Mainnet chain
+const monadMainnet = {
+  id: SupportedChains.monad.chainId,
+  name: SupportedChains.monad.chainName,
+  nativeCurrency: SupportedChains.monad.nativeCurrency,
+  rpcUrls: {
+    default: { http: SupportedChains.monad.rpcUrls },
+  },
+  blockExplorers: {
+    default: {
+      name: "MonadExplorer",
+      url: SupportedChains.monad.blockExplorerUrls[0],
+    },
+  },
+} as const;
+
+// Monad Mainnet RPC configuration
+const MONAD_RPC = SupportedChains.monad.rpcUrls[0];
 
 // Lazy connector initialization - timing sorunlarını önlemek için
 const getConnectors = () => {
@@ -27,9 +43,9 @@ const getConnectors = () => {
 
 // Wagmi configuration following Farcaster Mini App docs
 export const config = createConfig({
-  chains: [monadTestnet],
+  chains: [monadMainnet],
   transports: {
-    [monadTestnet.id]: http(MONAD_RPC, {
+    [monadMainnet.id]: http(MONAD_RPC, {
       timeout: 20000,
       retryCount: 3,
       fetchOptions: {
@@ -60,9 +76,7 @@ export default function FrameWalletProvider({
 }) {
   return (
     <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        {children}
-      </QueryClientProvider>
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     </WagmiProvider>
   );
 }

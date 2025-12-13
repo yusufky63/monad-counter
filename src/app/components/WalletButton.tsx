@@ -3,10 +3,12 @@
 import React, { useState, useEffect } from "react";
 import { useAccount, useConnect, useDisconnect, useChainId } from "wagmi";
 import { useSwitchChain } from "wagmi";
-// useFrame removed - haptics not needed
+import { useFrame } from "../providers/FrameProvider";
 
-// Monad Testnet Chain ID - Fixed network
-const MONAD_TESTNET_ID = 10143;
+import SupportedChains from "../config/chains";
+
+// Monad Chain ID - Fixed network
+const MONAD_TARGET_CHAIN_ID = SupportedChains.monad.chainId;
 
 export default function WalletButton() {
   const { isConnected, address } = useAccount();
@@ -14,30 +16,34 @@ export default function WalletButton() {
   const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
-  // Haptics removed
+  const { user, isInMiniApp } = useFrame();
 
   const [copied, setCopied] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
   // Auto-switch to Monad network after connection
   const autoSwitchToMonad = React.useCallback(async () => {
-    if (chainId !== MONAD_TESTNET_ID) {
+    if (chainId !== MONAD_TARGET_CHAIN_ID) {
       try {
-        console.log("🔄 Auto-switching to Monad Testnet");
-        await switchChain({ chainId: MONAD_TESTNET_ID });
-        console.log("✅ Auto-switched to Monad Testnet");
+        console.log(`🔄 Auto-switching to ${SupportedChains.monad.chainName}`);
+        await switchChain({ chainId: MONAD_TARGET_CHAIN_ID });
+        console.log(`✅ Auto-switched to ${SupportedChains.monad.chainName}`);
       } catch (error) {
         console.error("Auto-switch to Monad failed:", error);
       }
     }
   }, [chainId, switchChain]);
-  
+
   // Initial network check on component mount
   useEffect(() => {
     if (isConnected && chainId) {
-      console.log(`🚀 Initial network check: ${chainId === MONAD_TESTNET_ID ? 'CORRECT' : 'WRONG'} network detected`);
-      
-      if (chainId !== MONAD_TESTNET_ID) {
+      console.log(
+        `🚀 Initial network check: ${
+          chainId === MONAD_TARGET_CHAIN_ID ? "CORRECT" : "WRONG"
+        } network detected`
+      );
+
+      if (chainId !== MONAD_TARGET_CHAIN_ID) {
         console.log("🔄 Starting immediate network correction on mount...");
         setTimeout(() => autoSwitchToMonad(), 500);
       }
@@ -63,37 +69,49 @@ export default function WalletButton() {
       const connector =
         farcasterConnector || injectedConnector || connectors[0];
 
-        if (connector) {
-          console.log(`🔌 Connecting with ${connector.name || connector.id} in Farcaster`);
-          await connect({ connector });
+      if (connector) {
+        console.log(
+          `🔌 Connecting with ${connector.name || connector.id} in Farcaster`
+        );
+        await connect({ connector });
 
-          // Enhanced post-connection Monad switch for Farcaster
-          console.log("💫 Starting enhanced Monad switch sequence for Farcaster...");
-          
+        // Enhanced post-connection Monad switch for Farcaster
+        console.log(
+          "💫 Starting enhanced Monad switch sequence for Farcaster..."
+        );
+
+        setTimeout(async () => {
+          console.log("🔄 Phase 1: Initial auto-switch to Monad");
+          await autoSwitchToMonad();
+
+          // Double-check and retry if needed
           setTimeout(async () => {
-            console.log("🔄 Phase 1: Initial auto-switch to Monad");
-            await autoSwitchToMonad();
-            
-            // Double-check and retry if needed
-            setTimeout(async () => {
-              const currentChain = chainId;
-              console.log(`🔍 Phase 2: Verification - Current chain: ${currentChain}, Target: ${MONAD_TESTNET_ID}`);
-              
-              if (currentChain !== MONAD_TESTNET_ID) {
-                console.log("⚠️ Phase 2: Still wrong network, forcing switch...");
-                await autoSwitchToMonad();
-                
-                // Final verification
-                setTimeout(() => {
-                  const finalChain = chainId;
-                  console.log(`🏁 Final check: ${finalChain === MONAD_TESTNET_ID ? '✅ SUCCESS' : '❌ MANUAL REQUIRED'}`);
-                }, 1000);
-              } else {
-                console.log("✅ Phase 2: Successfully on Monad!");
-              }
-            }, 2000);
-          }, 1500);
-        }
+            const currentChain = chainId;
+            console.log(
+              `🔍 Phase 2: Verification - Current chain: ${currentChain}, Target: ${MONAD_TARGET_CHAIN_ID}`
+            );
+
+            if (currentChain !== MONAD_TARGET_CHAIN_ID) {
+              console.log("⚠️ Phase 2: Still wrong network, forcing switch...");
+              await autoSwitchToMonad();
+
+              // Final verification
+              setTimeout(() => {
+                const finalChain = chainId;
+                console.log(
+                  `🏁 Final check: ${
+                    finalChain === MONAD_TARGET_CHAIN_ID
+                      ? "✅ SUCCESS"
+                      : "❌ MANUAL REQUIRED"
+                  }`
+                );
+              }, 1000);
+            } else {
+              console.log("✅ Phase 2: Successfully on Monad!");
+            }
+          }, 2000);
+        }, 1500);
+      }
     } catch (error) {
       console.error("Connection error:", error);
     } finally {
@@ -123,10 +141,10 @@ export default function WalletButton() {
     }
   };
 
-  // Switch to Monad Testnet (forced)
+  // Switch to Monad (forced)
   const handleSwitchChain = async () => {
     try {
-      await switchChain({ chainId: MONAD_TESTNET_ID });
+      await switchChain({ chainId: MONAD_TARGET_CHAIN_ID });
     } catch (error) {
       console.error("Chain switch failed:", error);
     }
@@ -134,59 +152,79 @@ export default function WalletButton() {
 
   // Enhanced auto-switch with Farcaster compatibility
   useEffect(() => {
-    if (isConnected && chainId && chainId !== MONAD_TESTNET_ID) {
+    if (isConnected && chainId && chainId !== MONAD_TARGET_CHAIN_ID) {
       console.log(
-        `🚨 WRONG NETWORK DETECTED! Current: ${chainId}, Required: ${MONAD_TESTNET_ID}`
+        `🚨 WRONG NETWORK DETECTED! Current: ${chainId}, Required: ${MONAD_TARGET_CHAIN_ID}`
       );
-      
+
       // Enhanced switch with Farcaster detection
-      const attemptSwitchWithFarcasterSupport = async (attempt = 1, maxAttempts = 5) => {
-        console.log(`🔄 Switch attempt ${attempt}/${maxAttempts} for Farcaster environment`);
-        
+      const attemptSwitchWithFarcasterSupport = async (
+        attempt = 1,
+        maxAttempts = 5
+      ) => {
+        console.log(
+          `🔄 Switch attempt ${attempt}/${maxAttempts} for Farcaster environment`
+        );
+
         try {
           // Check if we're in Farcaster Mini App
-          const inFarcaster = typeof window !== 'undefined' && 
-            (window.parent !== window || 
-             document.referrer.includes('farcaster') ||
-             window.location.href.includes('farcaster'));
-             
+          const inFarcaster =
+            typeof window !== "undefined" &&
+            (window.parent !== window ||
+              document.referrer.includes("farcaster") ||
+              window.location.href.includes("farcaster"));
+
           console.log(`📱 Farcaster environment detected: ${inFarcaster}`);
-          
+
           await autoSwitchToMonad();
-          
+
           // Extra verification after switch
           setTimeout(async () => {
             const newChainId = chainId;
-            console.log(`✅ Post-switch verification: ${newChainId === MONAD_TESTNET_ID ? 'SUCCESS' : 'FAILED'}`);
-            
-            if (newChainId !== MONAD_TESTNET_ID && attempt < maxAttempts) {
-              console.log(`🔄 Chain still wrong, retrying in ${attempt * 2000}ms...`);
+            console.log(
+              `✅ Post-switch verification: ${
+                newChainId === MONAD_TARGET_CHAIN_ID ? "SUCCESS" : "FAILED"
+              }`
+            );
+
+            if (newChainId !== MONAD_TARGET_CHAIN_ID && attempt < maxAttempts) {
+              console.log(
+                `🔄 Chain still wrong, retrying in ${attempt * 2000}ms...`
+              );
               setTimeout(
-                () => attemptSwitchWithFarcasterSupport(attempt + 1, maxAttempts),
+                () =>
+                  attemptSwitchWithFarcasterSupport(attempt + 1, maxAttempts),
                 attempt * 2000 // Longer delays for Farcaster
               );
             }
           }, 1500);
-          
         } catch (error) {
           console.error(`❌ Switch attempt ${attempt} failed:`, error);
-          
+
           if (attempt < maxAttempts) {
-            console.log(`🔄 Retrying in ${attempt * 2000}ms... (Farcaster may need longer delays)`);
+            console.log(
+              `🔄 Retrying in ${
+                attempt * 2000
+              }ms... (Farcaster may need longer delays)`
+            );
             setTimeout(
               () => attemptSwitchWithFarcasterSupport(attempt + 1, maxAttempts),
               attempt * 2000
             );
           } else {
-            console.error("🚨 ALL AUTO-SWITCH ATTEMPTS FAILED! User must switch manually.");
+            console.error(
+              "🚨 ALL AUTO-SWITCH ATTEMPTS FAILED! User must switch manually."
+            );
           }
         }
       };
 
       // Start enhanced switch process
       attemptSwitchWithFarcasterSupport();
-    } else if (isConnected && chainId === MONAD_TESTNET_ID) {
-      console.log("✅ CORRECT NETWORK: Already on Monad Testnet");
+    } else if (isConnected && chainId === MONAD_TARGET_CHAIN_ID) {
+      console.log(
+        `✅ CORRECT NETWORK: Already on ${SupportedChains.monad.chainName}`
+      );
     }
   }, [isConnected, chainId, autoSwitchToMonad]);
 
@@ -202,14 +240,18 @@ export default function WalletButton() {
   // Connected state - Monad only
   if (isConnected && address) {
     const shortAddress = `${address.slice(0, 4)}...${address.slice(-3)}`;
-    const isOnMonad = chainId === MONAD_TESTNET_ID;
+    const isOnMonad = chainId === MONAD_TARGET_CHAIN_ID;
+
+    // Farcaster profil verisi varsa onu kullan, yoksa adresi göster
+    const displayName =
+      isInMiniApp && user?.username ? `@${user.username}` : shortAddress;
 
     return (
       <div
-        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-white shadow-sm transition-all ${
+        className={`flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full text-sm font-medium transition-all border ${
           isOnMonad
-            ? "bg-purple-600 hover:bg-purple-700"
-            : "bg-orange-600 hover:bg-orange-700 animate-pulse"
+            ? "bg-zinc-900 border-zinc-800 text-purple-400"
+            : "bg-amber-950/30 border-amber-900/50 text-amber-500"
         }`}
       >
         <span
@@ -217,7 +259,7 @@ export default function WalletButton() {
           onClick={handleCopyAddress}
           title={`${address} (click to copy)`}
         >
-          {shortAddress}
+          {displayName}
         </span>
 
         {/* Network indicator */}
@@ -225,8 +267,8 @@ export default function WalletButton() {
         {!isOnMonad && (
           <button
             onClick={handleSwitchChain}
-            className="px-2 py-1 text-xs bg-white/20 hover:bg-white/30 rounded transition-colors"
-            title="Switch to Monad Testnet"
+            className="px-3 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-full transition-colors"
+            title={`Switch to ${SupportedChains.monad.chainName}`}
           >
             Switch
           </button>
@@ -234,7 +276,11 @@ export default function WalletButton() {
 
         <button
           onClick={handleDisconnect}
-          className="p-1 hover:bg-white/20 rounded transition-colors"
+          className={`p-1.5 rounded-full transition-colors ${
+            isOnMonad
+              ? "hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+              : "hover:bg-amber-900 text-amber-400"
+          }`}
           title="Disconnect wallet"
         >
           <svg
@@ -252,12 +298,6 @@ export default function WalletButton() {
             />
           </svg>
         </button>
-
-        {copied && (
-          <span className="text-xs text-green-200 animate-fade-in">
-            Copied!
-          </span>
-        )}
       </div>
     );
   }

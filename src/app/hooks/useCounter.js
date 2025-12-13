@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { ethers } from "ethers";
 import { getContractAddress } from "../utils/ContractAddresses";
+import SupportedChains from "../config/chains";
 import counterABI from "../contract/ABI";
 
 // Cache süreleri (saniye cinsinden)
@@ -9,7 +10,6 @@ const CACHE_DURATION = {
   LEADERBOARD: 600, // 10 dakika
   CONTRIBUTION: 300, // 5 dakika
 };
-
 
 const initialData = {
   userStats: null,
@@ -32,11 +32,11 @@ export const useCounter = ({ chainId, address, isConnected }) => {
   const [shouldRefresh, setShouldRefresh] = useState(false);
   const [lastChainId, setLastChainId] = useState(chainId);
 
-  // Sabit Monad Testnet RPC Provider (hiçbir browser wallet gerektirmez)
+  // Sabit Monad Mainnet RPC Provider (hiçbir browser wallet gerektirmez)
   const provider = useMemo(() => {
     try {
       return new ethers.providers.JsonRpcProvider(
-        "https://testnet-rpc.monad.xyz"
+        SupportedChains.monad.rpcUrls[0]
       );
     } catch (error) {
       console.error("Failed to create RPC provider:", error);
@@ -152,12 +152,12 @@ export const useCounter = ({ chainId, address, isConnected }) => {
   const updateUserRank = useCallback(
     (leaderboard, userStats) => {
       if (!userStats || !address) return null;
-      
+
       // First try contract rank if available
       if (userStats.rank > 0) {
         return userStats.rank;
       }
-      
+
       // If contract rank is 0 but user has contributions, calculate client-side rank
       if (userStats.contribution > 0 && leaderboard.length > 0) {
         // Find user's position based on their contributions
@@ -167,13 +167,13 @@ export const useCounter = ({ chainId, address, isConnected }) => {
             rank++;
           }
         }
-        
+
         // If user should be in top 50, return the rank
         if (rank <= 50) {
           return rank;
         }
       }
-      
+
       return null;
     },
     [address]
@@ -185,7 +185,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
       if (!address || !ethersContract) return null;
 
       const result = await ethersContract.getContributionTarget(address);
-      
+
       return {
         current: result.current.toNumber(),
         target: result.target.toNumber(),
@@ -204,7 +204,7 @@ export const useCounter = ({ chainId, address, isConnected }) => {
       if (!address || !ethersContract) return null;
 
       const result = await ethersContract.getUserRankDetails(address);
-      
+
       return {
         rank: result.rank.toNumber() > 0 ? result.rank.toNumber() : null,
         nextRankDiff: result.nextRankDiff.toNumber(),

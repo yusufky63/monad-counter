@@ -2,12 +2,7 @@ import React from "react";
 import { useContext } from "react";
 import { ThemeContext } from "../context/ThemeContext";
 
-const StatCard = ({
-  theme,
-  value,
-  label,
-  color = "text-blue-500",
-}) => (
+const StatCard = ({ theme, value, label, color = "text-blue-500" }) => (
   <div
     className={`rounded-xl backdrop-blur-sm ${
       theme === "dark" ? "border-white/10" : "border-gray-200"
@@ -23,16 +18,12 @@ const StatCard = ({
         >
           {label}
         </div>
-      
       </div>
     </div>
   </div>
 );
 
-const UserStats = ({
-  userStats,
-
-}) => {
+const UserStats = ({ userStats }) => {
   const { theme } = useContext(ThemeContext);
 
   if (!userStats) {
@@ -48,14 +39,12 @@ const UserStats = ({
       } backdrop-blur-sm shadow-md`}
     >
       <div className="flex items-center justify-between">
-      
         <StatCard
           theme={theme}
           icon="🎯"
           value={userStats.contribution}
           label=" Your Contributions"
           color="text-blue-500"
-        
         />
       </div>
     </div>

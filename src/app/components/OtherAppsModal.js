@@ -32,44 +32,26 @@ const OtherAppsModal = ({ theme, onClose }) => {
       <div className="fixed inset-0 flex items-center justify-center p-2 md:p-4">
         {/* Backdrop */}
         <div
-          className={`absolute inset-0 ${
-            theme === "dark" ? "bg-black/50" : "bg-black/20"
-          } backdrop-blur-sm`}
+          className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm"
           onClick={onClose}
         />
 
         {/* Modal */}
         <div
-          className={`relative w-full max-w-md h-auto max-h-[80vh] flex flex-col ${
-            theme === "dark"
-              ? "bg-black/90 border-white/10"
-              : "bg-white border-gray-200"
-          } rounded-2xl border shadow-xl`}
+          className="relative w-full max-w-md h-auto max-h-[80vh] flex flex-col bg-zinc-900 border-zinc-800 rounded-2xl border shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div
-            className={`p-3 border-b ${
-              theme === "dark" ? "border-white/10" : "border-gray-200"
-            }`}
-          >
+          <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center justify-between">
-              <h3
-                className={`text-base font-medium tracking-tight ${
-                  theme === "dark" ? "text-white" : "text-gray-800"
-                }`}
-              >
-                <span className="bg-gradient-to-r from-violet-400 to-purple-600 bg-clip-text text-transparent">
-                  Other Apps
-                </span>
+              <h3 className="text-lg font-semibold tracking-tight text-purple-400">
+                Other Apps
               </h3>
               <button
                 onClick={onClose}
-                className={`p-1 rounded-full transition-colors ${
-                  theme === "dark" ? "hover:bg-white/10" : "hover:bg-gray-100"
-                }`}
+                className="p-1.5 rounded-full transition-colors hover:bg-zinc-800 text-zinc-400 hover:text-zinc-100"
               >
-                <FiX className="text-red-500" />
+                <FiX size={20} />
               </button>
             </div>
           </div>
@@ -81,11 +63,7 @@ const OtherAppsModal = ({ theme, onClose }) => {
                 <div
                   key={app.id}
                   onClick={() => handleAppClick(app)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all duration-200 hover:scale-[1.02] ${
-                    theme === "dark"
-                      ? "bg-gray-900/50 border-white/10 hover:bg-gray-800/70 hover:border-white/20"
-                      : "bg-gray-50/80 border-gray-200 hover:bg-gray-100 hover:border-gray-300"
-                  }`}
+                  className="p-4 rounded-xl border cursor-pointer transition-all duration-200 active:scale-[0.98] bg-zinc-800/50 border-zinc-700/50 hover:bg-zinc-800 hover:border-zinc-700"
                 >
                   <div className="flex items-center gap-3">
                     {/* App Icon */}
@@ -114,24 +92,12 @@ const OtherAppsModal = ({ theme, onClose }) => {
                     {/* App Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <h4
-                          className={`font-semibold text-sm truncate ${
-                            theme === "dark" ? "text-white" : "text-gray-900"
-                          }`}
-                        >
+                        <h4 className="font-semibold text-sm truncate text-zinc-100">
                           {app.name}
                         </h4>
-                        <FiExternalLink
-                          className={`w-3 h-3 flex-shrink-0 ${
-                            theme === "dark" ? "text-gray-400" : "text-gray-500"
-                          }`}
-                        />
+                        <FiExternalLink className="w-3 h-3 flex-shrink-0 text-zinc-500" />
                       </div>
-                      <p
-                        className={`text-xs mt-1 line-clamp-2 ${
-                          theme === "dark" ? "text-gray-400" : "text-gray-600"
-                        }`}
-                      >
+                      <p className="text-xs mt-1 line-clamp-2 text-zinc-400">
                         {app.description}
                       </p>
                     </div>

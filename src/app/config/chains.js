@@ -1,50 +1,36 @@
 /**
  * SupportedChains.js - Supported blockchain networks configuration
- * This file contains the configuration for the Monad Testnet chain.
+ * This file contains the configuration for the Monad chain.
  */
 
 const SupportedChains = {
   monad: {
     links: {
       website: "https://monad.xyz/",
-      faucet: [
-        "https://faucet.monad.xyz/",
-        "https://zkcodex.com/onchain/faucet",
-        "https://www.gas.zip/faucet/monad",
-        "https://thirdweb.com/monad-testnet",
-        "https://www.fau.gg/faucet",
-        "https://faucet.quicknode.com/monad/testnet",
-        "https://faucet.trade/monad-testnet-mon-faucet",
-      ],
     },
-    isFeeValue: 0.01,
+    isFeeValue: 5,
     isRequireFees: true,
     isPopular: true,
     isSuperchain: false,
-    isMainnet: false,
+    isMainnet: true,
     enabled: true,
     features: {
-      Deployer: true,
       Counter: true,
     },
-    chainId: 10143,
-    chainName: "Monad Testnet",
+    chainId: 143,
+    chainName: "Monad Mainnet",
     nativeCurrency: {
-      name: "Monad",
+      name: "MON",
       symbol: "MON",
       decimals: 18,
+      coingeckoId: "monad",
     },
-    rpcUrls: [
-      "https://testnet-rpc.monad.xyz",
-      "https://10143.rpc.thirdweb.com",
-      "https://monad-testnet.g.alchemy.com/v2/6hAsuhqJZ4ecT3Ld2GAy8W0RUeFPFmyl",
-      "https://monad-testnet.drpc.org",
-    ],
-    blockExplorerUrls: ["https://testnet.monadexplorer.com"],
+    rpcUrls: ["https://rpc.monad.xyz"],
+    blockExplorerUrls: ["https://monadvision.com"],
     imageUrl:
       "https://raw.githubusercontent.com/zkcodex/zkCodex-Assets/refs/heads/main/Icons/monad.png",
     contracts: {
-      Counter: "0xe205547f16E04cd4BC5928F0509aBECBB9f05D1a",
+      Counter: "0xe72463F43F8530746f49537092724FA6e23DeEbB",
     },
   },
 };
@@ -93,4 +79,4 @@ export const isSupportedChain = (chainId) => {
     (chain) => chain.chainId === chainId
   );
   return chain?.enabled || false;
-}; 
+};

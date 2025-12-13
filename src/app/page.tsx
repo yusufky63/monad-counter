@@ -24,8 +24,10 @@ import { getContractAddress } from "./utils/ContractAddresses";
 import counterABI from "./contract/ABI";
 import { useCounter } from "./hooks/useCounter";
 
-// Monad Testnet Chain ID
-const MONAD_CHAIN_ID = 10143;
+import SupportedChains from "./config/chains";
+
+// Monad Mainnet Chain ID
+const MONAD_CHAIN_ID = SupportedChains.monad.chainId;
 
 // Contract leaderboard data interface
 interface ContractLeaderboardItem {
@@ -90,33 +92,7 @@ export default function MonadCounterApp() {
             <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
           </div>
         </div>
-        <div className="text-center mt-4 text-gray-600 dark:text-gray-400 text-sm">
-          {isInMiniApp
-            ? "Initializing Mini App..."
-            : "Loading Monad Counter..."}
-          <div className="mt-2 text-xs opacity-70 space-y-1">
-            <div>SDK Loaded: {isSDKLoaded ? "✅" : "⏳"}</div>
-            <div>In Mini App: {isInMiniApp ? "✅" : "❌"}</div>
-            <div>
-              Platform:{" "}
-              {typeof navigator !== "undefined"
-                ? /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-                    navigator.userAgent
-                  )
-                  ? "📱 Mobile"
-                  : "💻 Desktop"
-                : "🔍 Unknown"}
-            </div>
-            <div>
-              Context:{" "}
-              {typeof window !== "undefined"
-                ? window.parent !== window
-                  ? "🖼️ Iframe"
-                  : "🌐 Direct"
-                : "🔍 SSR"}
-            </div>
-          </div>
-        </div>
+     
       </div>
     );
   }
@@ -178,13 +154,11 @@ function CounterApp() {
     }
   }, []);
 
-  // Wallet connection - dokümana göre - SADECE MONAD AĞI
   const handleWalletConnect = async () => {
     try {
       // Haptic feedback removed
 
       if (isConnected) {
-        // Zaten bağlı ama ağı kontrol et
         if (chainId !== MONAD_CHAIN_ID) {
           await handleNetworkSwitch();
         }
@@ -254,15 +228,19 @@ function CounterApp() {
   // Network switch - SADECE MONAD'A İZİN VER
   const handleNetworkSwitch = async () => {
     try {
-      toast.loading("Switching to Monad Testnet...", { id: "network-switch" });
+      toast.loading(`Switching to ${SupportedChains.monad.chainName}...`, {
+        id: "network-switch",
+      });
       await switchChain({ chainId: MONAD_CHAIN_ID });
       toast.dismiss("network-switch");
-      toast.success("Switched to Monad Testnet!");
+      toast.success(`Switched to ${SupportedChains.monad.chainName}!`);
       // Success notification removed
     } catch (error) {
       toast.dismiss("network-switch");
       console.error("Network switch failed:", error);
-      toast.error("Please manually switch to Monad Testnet");
+      toast.error(
+        `Please manually switch to ${SupportedChains.monad.chainName}`
+      );
     }
   };
 
@@ -286,12 +264,15 @@ function CounterApp() {
       );
       if (chainId !== MONAD_CHAIN_ID) {
         console.log(
-          "⚠️ Wrong network! Must be on Monad Testnet for transactions"
+          `⚠️ Wrong network! Must be on ${SupportedChains.monad.chainName} for transactions`
         );
-        toast("⚠️ Switching to Monad Testnet for transaction...", {
-          duration: 3000,
-          style: { background: "#f59e0b", color: "white" },
-        });
+        toast(
+          `⚠️ Switching to ${SupportedChains.monad.chainName} for transaction...`,
+          {
+            duration: 3000,
+            style: { background: "#f59e0b", color: "white" },
+          }
+        );
 
         try {
           await handleNetworkSwitch();
@@ -300,21 +281,25 @@ function CounterApp() {
 
           // Tekrar kontrol et - hala yanlış ağdaysa işlemi durdur
           if (chainId !== MONAD_CHAIN_ID) {
-            toast.error("Please switch to Monad Testnet to use the counter");
+            toast.error(
+              `Please switch to ${SupportedChains.monad.chainName} to use the counter`
+            );
             return;
           }
 
-          console.log("✅ Successfully switched to Monad Testnet");
+          console.log(
+            `✅ Successfully switched to ${SupportedChains.monad.chainName}`
+          );
           toast.success("Ready for transaction on Monad!", { duration: 2000 });
         } catch (error) {
           console.error("❌ Failed to switch network:", error);
           toast.error(
-            "Failed to switch to Monad Testnet. Please switch manually."
+            `Failed to switch to ${SupportedChains.monad.chainName}. Please switch manually.`
           );
           return;
         }
       } else {
-        console.log("✅ Already on Monad Testnet");
+        console.log(`✅ Already on ${SupportedChains.monad.chainName}`);
       }
 
       // writeContract hook'unun hazır olup olmadığını kontrol et
@@ -358,7 +343,7 @@ function CounterApp() {
           address: contractAddress,
           abi: counterABI,
           functionName: "incrementCounter",
-          value: parseEther("0.005"), // 0.005 MON fee
+          value: parseEther(SupportedChains.monad.isFeeValue.toString()), // Fee from config
         };
 
         console.log("Transaction params:", txParams);
@@ -411,7 +396,7 @@ function CounterApp() {
     if (!contractAddress) return;
 
     try {
-      const response = await fetch("https://testnet-rpc.monad.xyz", {
+      const response = await fetch(SupportedChains.monad.rpcUrls[0], {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -633,16 +618,14 @@ function CounterApp() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col ${
-        theme === "dark" ? "bg-black text-white" : "bg-white text-gray-900"
-      }`}
+      className="min-h-screen flex flex-col bg-zinc-950 text-zinc-100"
       style={safeAreaStyle}
     >
       {/* Header */}
       <div className="w-full p-6">
         <div className="flex items-center justify-between max-w-4xl mx-auto">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl md:text-2xl font-bold text-purple-600">
+            <h1 className="text-xl font-bold tracking-tight text-purple-400">
               Monad Counter
             </h1>
           </div>
@@ -652,68 +635,65 @@ function CounterApp() {
 
       {/* Main Counter */}
       <div className="flex-1 flex flex-col items-center justify-center px-4">
+        {/* Clean Card Container */}
         <div
-          className={`cursor-pointer py-8 px-6 text-center transition-all duration-200 ${
-            isTransactionPending ||
-            !connectorsReady ||
-            (isConnected && chainId !== MONAD_CHAIN_ID)
-              ? "pointer-events-none opacity-70 scale-95"
-              : "hover:scale-105"
-          }`}
+          className={`
+            w-full max-w-sm rounded-2xl p-8 text-center transition-all duration-300
+            bg-zinc-900 border border-zinc-800 shadow-xl
+            ${
+              isTransactionPending ||
+              !connectorsReady ||
+              (isConnected && chainId !== MONAD_CHAIN_ID)
+                ? "opacity-80"
+                : "hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            }
+          `}
           onClick={
             connectorsReady && (!isConnected || chainId === MONAD_CHAIN_ID)
               ? handleIncrement
               : undefined
           }
         >
-          {/* Network Status Warning */}
-          {isConnected && chainId !== MONAD_CHAIN_ID && (
-            <div className="mb-6 p-4 bg-red-100 dark:bg-red-900/30 border-2 border-red-300 dark:border-red-700 rounded-xl animate-pulse">
-              <div className="text-red-800 dark:text-red-200 text-base font-bold flex items-center gap-2">
-                🚫 Wrong Network Detected!
-              </div>
-              <div className="text-red-700 dark:text-red-300 text-sm mt-2 font-medium">
-                Counter only works on <strong>Monad Testnet</strong>
-              </div>
-              <div className="text-red-600 dark:text-red-400 text-xs mt-1">
-                Current: Chain {chainId} • Required: Chain {MONAD_CHAIN_ID}
-              </div>
-            </div>
-          )}
+          {/* Label */}
+          <div className="text-xs uppercase tracking-widest text-zinc-500 font-semibold mb-6">
+            Global Count
+          </div>
 
-          {/* Network Status - Success */}
-
-          {/* Counter value */}
-          <div className="mb-4">
-            <div className="text-6xl md:text-8xl font-bold font-mono text-purple-600">
+          {/* Counter value - Tabular nums for stability */}
+          <div className="mb-8">
+            <div className="text-5xl md:text-7xl font-bold font-mono tracking-tighter tabular-nums text-purple-400">
               {counter.replace(/\B(?=(\d{3})+(?!\d))/g, ",")}
             </div>
           </div>
 
-          <div className="text-sm text-gray-500 flex items-center justify-center gap-2">
+          {/* Status Indicator */}
+          <div className="h-6 flex items-center justify-center">
             {isTransactionPending ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-purple-500 border-t-transparent"></div>
-                Transaction pending...
-              </>
-            ) : !connectorsReady ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent"></div>
-                Initializing wallet...
-              </>
+              <div className="flex items-center gap-2 text-sm text-purple-600 font-medium">
+                <div className="w-2 h-2 rounded-full bg-purple-600 animate-pulse"></div>
+                Processing...
+              </div>
             ) : isConnected && chainId !== MONAD_CHAIN_ID ? (
-              <span className="text-red-500 font-medium">
-                ⚠️ Switch to Monad Testnet to increment
-              </span>
-            ) : isConnected && chainId === MONAD_CHAIN_ID ? (
-              <span className="text-gray-600 font-medium">
-                Tap to increment counter
-              </span>
+              <div className="flex items-center gap-2 text-sm text-amber-500 font-medium">
+                <div className="w-2 h-2 rounded-full bg-amber-500"></div>
+                Wrong Network
+              </div>
             ) : (
-              "Connect wallet to increment"
+              <div className="text-sm text-zinc-500 font-medium">
+                {isConnected ? "Tap to Increment" : "Connect to Play"}
+              </div>
             )}
           </div>
         </div>
+
+        {/* Subtle Network Warning (Outside Card) */}
+        {isConnected && chainId !== MONAD_CHAIN_ID && (
+          <div className="mt-6 text-center animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-amber-950/30 text-amber-400 text-sm font-medium border border-amber-900/50">
+              Please switch to {SupportedChains.monad.chainName}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -725,31 +705,19 @@ function CounterApp() {
               setIsLeaderboardOpen(true);
               fetchLeaderboard();
             }}
-            className={`${
-              theme === "dark"
-                ? "text-gray-400 hover:text-white"
-                : "text-gray-600 hover:text-black"
-            } transition-colors`}
+            className="text-zinc-400 hover:text-white transition-colors font-medium"
           >
             Leaderboard
           </button>
           <button
             onClick={() => setIsOtherAppsOpen(true)}
-            className={`${
-              theme === "dark"
-                ? "text-purple-600 hover:text-white"
-                : "text-purple-600 hover:text-black"
-            } transition-colors animate-pulse`}
+            className="text-purple-400 hover:text-purple-300 transition-colors font-medium"
           >
             Other Apps
           </button>
           <button
             onClick={() => setIsHowItWorksOpen(true)}
-            className={`${
-              theme === "dark"
-                ? "text-gray-400 hover:text-white"
-                : "text-gray-600 hover:text-black"
-            } transition-colors`}
+            className="text-zinc-400 hover:text-white transition-colors font-medium"
           >
             How it works
           </button>
@@ -782,7 +750,7 @@ function CounterApp() {
         <HowItWorksModal
           onClose={() => setIsHowItWorksOpen(false)}
           theme={theme}
-          fee={parseEther("0.005")}
+          fee={parseEther(SupportedChains.monad.isFeeValue.toString())}
         />
       )}
     </div>

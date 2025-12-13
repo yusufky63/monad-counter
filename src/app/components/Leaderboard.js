@@ -3,13 +3,13 @@ import { ThemeContext } from "../context/ThemeContext";
 
 const MIN_CONTRIBUTIONS_FOR_LEADERBOARD = 0; // Minimum number of contributions
 
-const Leaderboard = ({ 
-  leaderboard = [], 
-  userAddress, 
-  userStats, 
-  userRank, 
-  loading, 
-  hideTitle = false 
+const Leaderboard = ({
+  leaderboard = [],
+  userAddress,
+  userStats,
+  userRank,
+  loading,
+  hideTitle = false,
 }) => {
   console.log(leaderboard);
   const { theme } = useContext(ThemeContext);
@@ -19,32 +19,34 @@ const Leaderboard = ({
   // Process and memoize leaderboard data
   const processedLeaderboard = useMemo(() => {
     if (!Array.isArray(leaderboard)) return [];
-    console.log('[Leaderboard.js] Incoming data:', leaderboard);
-    
-    let processedData = leaderboard
-      .filter(user => 
-        user && 
-        user.userAddress && 
-        user.userAddress !== '0x0000000000000000000000000000000000000000' &&
+    console.log("[Leaderboard.js] Incoming data:", leaderboard);
+
+    let processedData = leaderboard.filter(
+      (user) =>
+        user &&
+        user.userAddress &&
+        user.userAddress !== "0x0000000000000000000000000000000000000000" &&
         Number(user.contributions) >= MIN_CONTRIBUTIONS_FOR_LEADERBOARD
-      );
-    
+    );
+
     // Add user to leaderboard if they have contributions but aren't in the list
     if (userStats && userRank && userAddress && userStats.contribution > 0) {
       const userInLeaderboard = processedData.find(
-        user => user.userAddress?.toLowerCase() === userAddress.toLowerCase()
+        (user) => user.userAddress?.toLowerCase() === userAddress.toLowerCase()
       );
-      
+
       if (!userInLeaderboard) {
         processedData.push({
           userAddress: userAddress,
           contributions: userStats.contribution,
-          lastUpdate: Date.now()
+          lastUpdate: Date.now(),
         });
       }
     }
-    
-    return processedData.sort((a, b) => Number(b.contributions) - Number(a.contributions));
+
+    return processedData.sort(
+      (a, b) => Number(b.contributions) - Number(a.contributions)
+    );
   }, [leaderboard, userStats, userRank, userAddress]);
 
   // Loading skeleton UI
@@ -58,10 +60,10 @@ const Leaderboard = ({
         } backdrop-blur-sm shadow-md`}
       >
         {!hideTitle && (
-        <div className="flex items-center justify-between mb-6">
-          <div className="h-8 w-1/3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg"></div>
-          <div className="h-6 w-1/4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full"></div>
-        </div>
+          <div className="flex items-center justify-between mb-6">
+            <div className="h-8 w-1/3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-lg"></div>
+            <div className="h-6 w-1/4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-full"></div>
+          </div>
         )}
         {[...Array(5)].map((_, i) => (
           <div
@@ -95,10 +97,12 @@ const Leaderboard = ({
             theme === "dark" ? "text-gray-400" : "text-gray-500"
           }`}
         >
-          <div className="text-5xl mb-3">🏆</div>
+          <div className="text-3xl mb-3">🏆</div>
           <p className="text-lg mb-2">No one is on the leaderboard yet</p>
           <p className="text-sm opacity-75">
-            Be the first leader! You can enter the list by making at least {MIN_CONTRIBUTIONS_FOR_LEADERBOARD} contribution{MIN_CONTRIBUTIONS_FOR_LEADERBOARD > 1 ? "s" : ""}.
+            Be the first leader! You can enter the list by making at least{" "}
+            {MIN_CONTRIBUTIONS_FOR_LEADERBOARD} contribution
+            {MIN_CONTRIBUTIONS_FOR_LEADERBOARD > 1 ? "s" : ""}.
           </p>
         </div>
       </div>
@@ -126,28 +130,28 @@ const Leaderboard = ({
 
   return (
     <div
-      className={`p-4 rounded-2xl border ${
+      className={`p-3 rounded-2xl border ${
         theme === "dark"
           ? "border-white/10 bg-black/30"
           : "border-black/5 bg-white/80"
       } backdrop-blur-sm shadow-md`}
     >
       {!hideTitle && (
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
-          Leaderboard
-        </h2>
-        <div
-          className={`px-3 py-1 rounded-full text-xs font-medium ${
-            theme === "dark"
-              ? "bg-blue-500/10 text-blue-400"
-              : "bg-blue-500/10 text-blue-600"
-          }`}
-        >
-          Total: {processedLeaderboard.length} User
-          {processedLeaderboard.length !== 1 ? "s" : ""}
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-bold bg-gradient-to-r from-blue-500 to-blue-600 bg-clip-text text-transparent">
+            Leaderboard
+          </h2>
+          <div
+            className={`px-3 py-1 rounded-full text-xs font-medium ${
+              theme === "dark"
+                ? "bg-blue-500/10 text-blue-400"
+                : "bg-blue-500/10 text-blue-600"
+            }`}
+          >
+            Total: {processedLeaderboard.length} User
+            {processedLeaderboard.length !== 1 ? "s" : ""}
+          </div>
         </div>
-      </div>
       )}
 
       <div className="space-y-3 pr-1">
@@ -184,9 +188,9 @@ const Leaderboard = ({
 
               <div className="ml-3 flex-grow min-w-0">
                 <div
-                  className={`font-medium truncate ${
+                  className={`font-medium truncate text-xs ${
                     isCurrentUser
-                      ? "bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent text-xs "
+                      ? "bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent "
                       : theme === "dark"
                       ? "text-white"
                       : "text-gray-900"
