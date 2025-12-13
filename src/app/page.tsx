@@ -104,7 +104,7 @@ export default function MonadCounterApp() {
 function CounterApp() {
   const { theme } = React.useContext(ThemeContext);
   // Haptics removed
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const { connect, connectors } = useConnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
@@ -157,12 +157,20 @@ function CounterApp() {
     try {
       // Haptic feedback removed
 
-      if (isConnected) {
+      // Validate connection integrity
+      const isConnectionValid =
+        isConnected && connector && typeof connector.getChainId === "function";
+
+      if (isConnectionValid) {
         if (chainId !== MONAD_CHAIN_ID) {
           await handleNetworkSwitch();
         }
         return;
       }
+
+      console.log(
+        "⚠️ Connection invalid or checking prerequisites, proceeding to connect..."
+      );
 
       // Connector'ların hazır olup olmadığını kontrol et
       if (!connectors || connectors.length === 0) {
@@ -173,8 +181,18 @@ function CounterApp() {
         }
       }
 
+      // Valid connectors (those that have getChainId)
+      const validConnectors = connectors.filter(
+        (c) => c && typeof c.getChainId === "function"
+      );
+
+      if (validConnectors.length === 0) {
+        console.error("No valid connectors (with getChainId) available");
+        throw new Error("No valid connectors available");
+      }
+
       // Farcaster Mini App connector'ını bul
-      const farcasterConnector = connectors.find(
+      const farcasterConnector = validConnectors.find(
         (connector) =>
           connector.name === "farcasterMiniApp" ||
           connector.id === "farcaster" ||
@@ -182,31 +200,18 @@ function CounterApp() {
       );
 
       console.log(
-        "Available connectors:",
-        connectors.map((c) => ({ name: c.name, id: c.id }))
+        "Available valid connectors:",
+        validConnectors.map((c) => ({ name: c.name, id: c.id }))
       );
 
       if (farcasterConnector) {
         console.log("Using Farcaster connector:", farcasterConnector.name);
-
-        // Connector'ın getChainId metodunu kontrol et
-        if (typeof farcasterConnector.getChainId !== "function") {
-          console.warn(
-            "Farcaster connector not fully initialized, using fallback"
-          );
-          await connect({ connector: connectors[0] });
-        } else {
-          await connect({ connector: farcasterConnector });
-        }
+        await connect({ connector: farcasterConnector });
       } else {
-        console.log("Farcaster connector not found, using first available");
-        // İlk kullanılabilir connector'ı kontrol et
-        const firstConnector = connectors[0];
-        if (firstConnector && typeof firstConnector.getChainId === "function") {
-          await connect({ connector: firstConnector });
-        } else {
-          throw new Error("No valid connectors available");
-        }
+        console.log(
+          "Farcaster connector not found or invalid, using first available valid connector"
+        );
+        await connect({ connector: validConnectors[0] });
       }
 
       // Success notification removed
@@ -251,8 +256,13 @@ function CounterApp() {
       console.log("🔍 Checking prerequisites for counter increment...");
 
       // 1. Wallet bağlantısını kontrol et
-      if (!isConnected) {
-        console.log("❌ Wallet not connected, connecting...");
+      const isConnectionValid =
+        isConnected && connector && typeof connector.getChainId === "function";
+
+      if (!isConnectionValid) {
+        console.log(
+          "❌ Wallet not connected or invalid connector, connecting..."
+        );
         await handleWalletConnect();
         return;
       }
