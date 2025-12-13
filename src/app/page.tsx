@@ -48,7 +48,7 @@ interface LeaderboardUIItem {
 }
 
 export default function MonadCounterApp() {
-  const { isSDKLoaded, isInMiniApp, callReady } = useFrame();
+  const { isSDKLoaded, callReady } = useFrame();
   const [isAppReady, setIsAppReady] = useState(false);
 
   // Mobile için agresif ready() çağrısı - SDK yüklenir yüklenmez
@@ -92,7 +92,6 @@ export default function MonadCounterApp() {
             <div className="h-10 w-20 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
           </div>
         </div>
-     
       </div>
     );
   }
@@ -740,16 +739,12 @@ function CounterApp() {
       )}
 
       {isOtherAppsOpen && (
-        <OtherAppsModal
-          onClose={() => setIsOtherAppsOpen(false)}
-          theme={theme}
-        />
+        <OtherAppsModal onClose={() => setIsOtherAppsOpen(false)} />
       )}
 
       {isHowItWorksOpen && (
         <HowItWorksModal
           onClose={() => setIsHowItWorksOpen(false)}
-          theme={theme}
           fee={parseEther(SupportedChains.monad.isFeeValue.toString())}
         />
       )}

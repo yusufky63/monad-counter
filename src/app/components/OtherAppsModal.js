@@ -3,7 +3,7 @@ import { FiX, FiExternalLink } from "react-icons/fi";
 import appsData from "../../../apps.json";
 import Image from "next/image";
 
-const OtherAppsModal = ({ theme, onClose }) => {
+const OtherAppsModal = ({ onClose }) => {
   const handleAppClick = async (app) => {
     try {
       // Haptic feedback if available

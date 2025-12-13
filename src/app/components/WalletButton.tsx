@@ -18,7 +18,6 @@ export default function WalletButton() {
   const { switchChain } = useSwitchChain();
   const { user, isInMiniApp } = useFrame();
 
-  const [copied, setCopied] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
 
   // Auto-switch to Monad network after connection
@@ -128,18 +127,6 @@ export default function WalletButton() {
     }
   };
 
-  // Copy address to clipboard
-  const handleCopyAddress = async () => {
-    if (!address) return;
-
-    try {
-      await navigator.clipboard.writeText(address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
-      console.error("Copy failed:", error);
-    }
-  };
 
   // Switch to Monad (forced)
   const handleSwitchChain = async () => {
@@ -256,7 +243,6 @@ export default function WalletButton() {
       >
         <span
           className="font-mono text-sm cursor-pointer hover:underline"
-          onClick={handleCopyAddress}
           title={`${address} (click to copy)`}
         >
           {displayName}
