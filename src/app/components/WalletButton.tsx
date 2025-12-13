@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useAccount, useConnect, useDisconnect, useChainId } from "wagmi";
+import { useAccount, useConnect, useChainId } from "wagmi";
 import { useSwitchChain } from "wagmi";
 import { useFrame } from "../providers/FrameProvider";
 
@@ -13,7 +13,6 @@ const MONAD_TARGET_CHAIN_ID = SupportedChains.monad.chainId;
 export default function WalletButton() {
   const { isConnected, address } = useAccount();
   const { connect, connectors, status: connectStatus } = useConnect();
-  const { disconnect } = useDisconnect();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const { user, isInMiniApp } = useFrame();
@@ -118,14 +117,6 @@ export default function WalletButton() {
     }
   };
 
-  // Disconnection
-  const handleDisconnect = async () => {
-    try {
-      disconnect();
-    } catch (error) {
-      console.error("Disconnect error:", error);
-    }
-  };
 
   // Switch to Monad (forced)
   const handleSwitchChain = async () => {

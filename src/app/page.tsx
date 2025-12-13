@@ -49,17 +49,15 @@ interface LeaderboardUIItem {
 }
 
 export default function MonadCounterApp() {
-  const { isSDKLoaded, callReady, isInMiniApp } = useFrame();
+  const { isSDKLoaded, callReady } = useFrame();
   const [isAppReady, setIsAppReady] = useState(false);
 
-  // Mobile için agresif ready() çağrısı - SDK yüklenir yüklenmez
   useEffect(() => {
     if (isSDKLoaded) {
       console.log(
         "🚀 SDK loaded, calling ready() immediately for mobile compatibility"
       );
 
-      // Mobile için hiç beklemeden ready() çağır
       (async () => {
         try {
           await callReady();
@@ -74,7 +72,6 @@ export default function MonadCounterApp() {
     }
   }, [isSDKLoaded, callReady]);
 
-  // Loading state - dokümana göre
   if (!isAppReady) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-white dark:bg-black">
